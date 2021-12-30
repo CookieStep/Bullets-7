@@ -13,7 +13,7 @@ var panSpeed = 0.2;
 var zoomSpeed = 0.1;
 var level = 0;
 var player;
-var creator = 1;
+var creator;
 var edit;
 
 var loader = {

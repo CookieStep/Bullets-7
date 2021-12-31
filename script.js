@@ -11,7 +11,7 @@ var cameraState = "";
 var zoomLevel = 2;
 var panSpeed = 0.2;
 var zoomSpeed = 0.1;
-var level = 1;
+var level = 0;
 var player;
 var creator = window.creator;
 var edit;

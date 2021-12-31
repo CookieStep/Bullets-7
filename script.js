@@ -832,6 +832,9 @@ var TIME = 0;
                     blob.drawWith({alpha});
                 }
                 --loader.delay;
+                if(loader.delay == 50) {
+                    mapTiles = [];
+                }
                 if(loader.delay == 0) {
                     loader.load();
                 }

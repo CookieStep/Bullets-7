@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.2";
+const gameVersion = "0.0.3";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -909,7 +909,31 @@ var TIME = 0;
         }
     };
     shape("square", ctx => ctx.rect(0, 0, 1, 1));
-    shape("square", ctx => ctx.rect(0, 0, 1, 1));
+    shape("square-horns", ctx => {
+        var a = 0.3;
+        // ctx.rect(0, 0, 1-a, 1);
+        ctx.lineTo(1-a, 0);
+        ctx.lineTo(1, 0);
+        ctx.lineTo(1-a, a);
+        ctx.lineTo(1-a, 1-a);
+        ctx.lineTo(1, 1);
+        ctx.lineTo(1-a, 1);
+        ctx.lineTo(0, 1);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+    });
+    shape("square.3", ctx => {
+        var r = .3;
+        ctx.moveTo(r, 0);
+        ctx.lineTo(1 - r, 0);
+        ctx.quadraticCurveTo(1, 0, 1, 0 + r);
+        ctx.lineTo(1, 1 - r);
+        ctx.quadraticCurveTo(1, 1, 1 - r, 1);
+        ctx.lineTo(r, 1);
+        ctx.quadraticCurveTo(0, 1, 0, 1 - r);
+        ctx.lineTo(0, r);
+        ctx.quadraticCurveTo(0, 0, r, 0);
+    });
     shape("square.4", ctx => {
         var r = .4;
         ctx.moveTo(r, 0);
@@ -1458,8 +1482,8 @@ var TEAM = {
 {
     var Player = class Player extends Entity
     {
-        color = "blue";
-        shape = "square.4";
+        color = "#55f";
+        shape = "square.3";
         tick()
         {
             this.keys();
@@ -1629,6 +1653,7 @@ var TEAM = {
             this.move(atan(this.vy, this.vx));
         }
         color = "#ff5";
+        shape = "square.4";
     };
     var Stuck = class Stuck extends Enemy
     {
@@ -1638,6 +1663,7 @@ var TEAM = {
             this.r = r ?? random(PI2);
         }
         color = "#5f5";
+        shape = "square";
         hitWall(x, y)
         {
             var vx = cos(this.r);
@@ -1887,6 +1913,7 @@ var TEAM = {
         team = 0;
         hits = 0;
         wallInv = -1;
+        shape = "square-horns";
         coll = TEAM.GOOD | TEAM.BAD;
         m = 20;
         constructor(target) {

@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.3";
+const gameVersion = "0.0.4";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -11,44 +11,50 @@ var cameraState = "";
 var zoomLevel = 2;
 var panSpeed = 0.2;
 var zoomSpeed = 0.1;
-var level = 0;
+var level = 1;
 var player;
 var creator = window.creator;
 var edit;
 var DEAD = 10;
 
-var loader = {
-    load() {
-        mapTiles = this.tiles;
-        for(let enemy of enemies) {
-            if(enemy.inWall() && !enemy.wallInv) {
-                enemy.wallInv = 1;
-            }
-        }
-        this.delay = 0;
-        var arr = [];
-        for(let blob of this.enemies) {
-            var hit = false;
-            for(let them of enemies) {
-                if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
-                    hit = true;
-                    break;
+{
+    let canv = document.createElement("canvas");
+    let octx = canv.getContext("2d");
+    var loader = {
+        load() {
+            mapTiles = this.tiles;
+            for(let enemy of enemies) {
+                if(enemy.inWall() && !enemy.wallInv) {
+                    enemy.wallInv = 1;
                 }
             }
-            if(hit) arr.push(blob);
-            else enemies.push(blob);
-        }
-        if(arr.length) {
-            this.enemies = arr;
-            this.delay = 1;
-        }else{
-            this.tiles = [];
-            this.enemies = [];
-        }
-    },
-    enemies: [],
-    tiles: [],
-    delay: 0
+            this.delay = 0;
+            var arr = [];
+            for(let blob of this.enemies) {
+                var hit = false;
+                for(let them of enemies) {
+                    if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
+                        hit = true;
+                        break;
+                    }
+                }
+                if(hit) arr.push(blob);
+                else enemies.push(blob);
+            }
+            if(arr.length) {
+                this.enemies = arr;
+                this.delay = 1;
+            }else{
+                this.tiles = [];
+                this.enemies = [];
+            }
+        },
+        canvas: canv,
+        ctx: octx,
+        enemies: [],
+        tiles: [],
+        delay: 0
+    }
 }
 
 //menu.js
@@ -137,14 +143,14 @@ var loader = {
             this.set(this.value);
         };
     }
-    States.colors = ["#555", "#5f5", "#ff5"];
+    States.colors = ["#555", "#5f5", "#ff5", "#a5f"];
     States.color = value => States.colors[value % States.colors.length];
     let load = id => localStorage.getItem(id);
     let save = (id, val) => localStorage.setItem(id, val);
-    let camOpt = new States(4, value => {
-        cameraState = ["screen", "player", "mouse", "lock"][value];
+    let camOpt = new States(5, value => {
+        cameraState = ["screen", "player", "mouse", "auto", "lock"][value];
         save("cam.state", value);
-        return ["Camera: Full Screen", "Camera: Following Player", "Camera: Following Mouse", "Camera: Locked"][value];
+        return ["Camera: Full Screen", "Camera: Following Player", "Camera: Following Mouse", "Camera: Auto", "Camera: Locked"][value];
     }, () => +load("cam.state") ?? 1);
     let zoomOpt = new Slider({min: 0.5, max: 2, inc: 0.1}, (value, obj) => {
         zoomLevel = value;
@@ -225,6 +231,11 @@ var loader = {
                 ctx.fillStyle = i == menu.item? "#33b": "#555";
                 ctx.fillText(item.label, wid2 + (w - wid)*.5, y);
 
+                ctx.strokeStyle = "#222";
+                ctx.lineWidth = h/20;
+                ctx.strokeText(txt, (w - wid)*.5, y);
+                ctx.fillStyle = States.color(item.value);
+
                 ctx.fillStyle = item.value? "#5f5": "#f55";
                 ctx.fillText(txt, (w - wid)*.5, y);
             }else if(item instanceof States) {
@@ -235,6 +246,9 @@ var loader = {
                 ctx.fillStyle = i == menu.item? "#33b": "#555";
                 ctx.fillText(item.label, wid2 + (w - wid)*.5, y);
 
+                ctx.strokeStyle = "#222";
+                ctx.lineWidth = h/20;
+                ctx.strokeText(txt, (w - wid)*.5, y);
                 ctx.fillStyle = States.color(item.value);
                 ctx.fillText(txt, (w - wid)*.5, y);
             }else if(item instanceof Slider) {
@@ -248,7 +262,7 @@ var loader = {
                 wid2 = ctx.measureText(txt).width;
 
                 ctx.lineWidth = h/20;
-                ctx.strokeStyle = ctx.fillStyle;
+                ctx.strokeStyle = "#222";
                 ctx.fillStyle = "#555";
                 ctx.fillRect((w-wid)*.5, y - h * .4, wid2, h/2);
                 ctx.fillStyle = "#33b";
@@ -313,7 +327,7 @@ var loader = {
     var scale = 40;
     var sf = 1/20;
 
-    var {PI, cos, sin, tan, round, sign, sqrt, abs, atan2: atan, min, floor, ceil} = Math;
+    var {PI, cos, sin, tan, round, sign, sqrt, abs, atan2: atan, min, max, floor, ceil} = Math;
     var dist = (x, y) => sqrt(x * x + y * y);
     var loop = (value, max) => (value % max + max) % max;
     var rotate = (value, range) =>
@@ -363,7 +377,8 @@ var loader = {
     lehmer.seed = 9;
 
     var game = {
-        zoom(x, y, l=1, w=1, r, fx, fy) {
+        zoom(x, y, l=1, w=1, r, fx, fy, ctx) {
+            ctx = ctx || this.ctx;
             x += this._x;
             y += this._y;
             x *= scale;
@@ -382,7 +397,8 @@ var loader = {
                 ctx.translate(-.5, -.5);
             }
         },
-        scale() {
+        scale(ctx) {
+            ctx = ctx || this.ctx;
             ctx.scale(scale, scale);
             ctx.translate(game._x, game._y);
         },
@@ -395,9 +411,7 @@ var loader = {
 
             var m = zoomSpeed;
             var zoom = zoomLevel;
-            if(cameraState == "screen" && zoom > 1) {
-                zoom = 1;
-            }
+            if(this.zoomO) zoom = this.zoomO;
             if(this.zoomL != zoom)
             {
                 var value = snapTo(this.zoomL, zoom, m);
@@ -431,10 +445,12 @@ var loader = {
             }
         },
         camera() {
+            delete this.zoomO;
             if(cameraState == "screen") {
                 let s = 1/scale;
                 game.x = (game.w - (innerWidth * s)) * -.5;
                 game.y = (game.h - (innerHeight * s)) * -.5;
+                this.zoooO = 1;
             }
             if(cameraState == "player") {
                 let s = 1/scale;
@@ -463,6 +479,38 @@ var loader = {
                 game.x -= x;
                 game.y -= y;
             }
+            if(cameraState == "auto") {
+                let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.dead ||blob.remove || (blob.team & TEAM.BULLET)));
+                let p = 1;
+                if(loader.delay > 1 || !arr.length) {
+                    minX = -p;
+                    maxX = game.w + p;
+                    minY = -p;
+                    maxY = game.h + p;
+                }else{
+                    var xa = arr.map(blob => blob.x + blob.s*.5);
+                    var ya = arr.map(blob => blob.y + blob.s*.5);
+                    var minX = min(...xa) - p;
+                    var maxX = max(...xa) + p;
+                    var minY = min(...ya) - p;
+                    var maxY = max(...ya) + p;
+                }
+                var zoomX = game.w/(maxX - minX);
+                var zoomY = game.h/(maxY - minY);
+                var zoomLevel = min(zoomX, zoomY);
+                if(zoomLevel < 0.5) zoomLevel = 0.5;
+                if(zoomLevel > 2) zoomLevel = 2;
+                this.zoomO = zoomLevel;
+                var px = (minX + maxX)*.5;
+                var py = (minY + maxY)*.5;
+
+                let s = 1/scale;
+                game.x = (game.zw - (innerWidth * s)) * -.5;
+                game.y = (game.zh - (innerHeight * s)) * -.5;
+                // s = player.s * .5;
+                game.x += game.zw * .5 - px;
+                game.y += game.zh * .5 - py;
+            }
             if(lockToEdges) {
                 var sw = innerWidth/scale;
                 if(sw >= game.w) {
@@ -483,6 +531,7 @@ var loader = {
                 }
             }
         },
+        ctx,
         length: 0,
         height: 0,
         width:  0,
@@ -527,6 +576,8 @@ var loader = {
         game.height = innerHeight;
         canvas.height = game.height;
         canvas.width = game.width;
+        loader.canvas.height = game.height;
+        loader.canvas.width = game.width;
 
         rescale();
 
@@ -783,6 +834,7 @@ var TIME = 0;
             if(keys.use("Digit1")) setCam(1);
             if(keys.use("Digit2")) setCam(2);
             if(keys.use("Digit3")) setCam(3);
+            if(keys.use("Digit4")) setCam(4);
 
             if(keys.hold("Equal")) modZoom(1);
             if(keys.hold("Minus")) modZoom(-1);
@@ -807,30 +859,182 @@ var TIME = 0;
             ctx.strokeStyle = "grey";
             ctx.lineWidth = 0.01;
             game.scale();
-            ctx.fillStyle = "white";
+            {
+                let w = game.w;
+                let h = game.h;
+                let x = w * .5;
+                let y = h * .5;
+                let r = max(w,h);
+                // let col = ctx.createLinearGradient(0, h, w, 0);
+                let col = ctx.createRadialGradient(x, y, 1, x, y, r);
+                col.addColorStop(0, "#3c3c3c");
+                col.addColorStop(.5, "#393939");
+                col.addColorStop(1, "#303030");
+                ctx.fillStyle = col;
+            }
+            ctx.fillRect(0, 0, game.w, game.h);
+            {
+                let w = game.w;
+                let h = game.h;
+                let col = ctx.createLinearGradient(0, 0, w, h);
+                col.addColorStop(0, "#bbb");
+                col.addColorStop(.5, "#fff");
+                col.addColorStop(1, "#aaa");
+                ctx.fillStyle = col;
+            }
+            function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
+                function edge(x, y) {
+                    if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
+                        return !((x < -1 || x > game.w) || (y < -1 || y > game.h))
+                    }
+                }
+                var res = [];
+                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                {
+                    dx = floor(dx + x);
+                    dy = floor(dy + y);
+                    if(edge(dx, dy)) res.push(1);
+                    else if(outOfBounds(dx, dy)) res.push(0);
+                    else if(tiles[Index(dx, dy)]) res.push(1);
+                    else res.push(0);
+                }
+                var [t, b, l, r, tl, bl, tr, br] = res;
+
+                var m = 0.02;
+                var o = .3;
+                x = x - m;
+                y = y - m;
+                var a = x + o;
+                var g = x + 1 - o;
+                var c = x + 1 + m;
+                var d = y + o;
+                var e = y + 1 - o;
+                var f = y + 1 + m;
+                ctx.beginPath();
+                ctx.moveTo(a, y);
+                if(t || r || tr) {
+                    ctx.lineTo(c, y);
+                }else{
+                    ctx.lineTo(g, y);
+                    ctx.quadraticCurveTo(c, y, c, d);
+                }
+                if(b || r || br) {
+                    ctx.lineTo(c, f);
+                }else{
+                    ctx.lineTo(c, e);
+                    ctx.quadraticCurveTo(c, f, g, f);
+                }
+                if(b || l || bl) {
+                    ctx.lineTo(x, f)
+                }else{
+                    ctx.lineTo(a, f);
+                    ctx.quadraticCurveTo(x, f, x, e);
+                }
+                if(t || l || tl) {
+                    ctx.lineTo(x, y);
+                }else{
+                    ctx.lineTo(x, d);
+                    ctx.quadraticCurveTo(x, y, a, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
+                function edge(x, y) {
+                    return (x == -1 || x == game.w) || (y == -1 || y == game.h);
+                }
+                if(edge(x, y)) return;
+                var res = [];
+                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                {
+                    dx += x;
+                    dy += y;
+                    if(edge(dx, dy)) res.push(1);
+                    else if(outOfBounds(dx, dy)) res.push(0);
+                    else if(tiles[Index(dx, dy)]) res.push(1);
+                    else res.push(0);
+                }
+                var [t, b, l, r] = res;
+
+                if(!(t || b || l || r)) return;
+
+                var m = 0.01;
+                x = x - m;
+                y = y - m
+                var o = .5;
+                var a = x + o;
+                var g = x + 1 - o;
+                var c = x + 1 + m;
+                var d = y + o;
+                var e = y + 1 - o;
+                var f = y + 1 + m;
+                ctx.beginPath();
+                if(t && r) {
+                    ctx.moveTo(a, y);
+                    ctx.lineTo(g, y);
+                    ctx.quadraticCurveTo(c, y, c, d);
+                    ctx.lineTo(c, y);
+                    var dr = true;
+                }
+                if(b && r) {
+                    ctx.moveTo(c, y);
+                    ctx.lineTo(c, e);
+                    ctx.quadraticCurveTo(c, f, g, f);
+                    ctx.lineTo(c, f);
+                    var dr = true;
+                }
+                if(b && l) {
+                    ctx.moveTo(c, f);
+                    ctx.lineTo(a, f);
+                    ctx.quadraticCurveTo(x, f, x, e);
+                    ctx.lineTo(x, f);
+                    var dr = true;
+                }
+                if(t && l) {
+                    ctx.moveTo(x, f);
+                    ctx.lineTo(x, d);
+                    ctx.quadraticCurveTo(x, y, a, y);
+                    ctx.lineTo(x, y);
+                    var dr = true;
+                }
+                if(dr) {
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
                 let i = Index(x, y);
-                ctx.strokeRect(x, y, 1, 1);
-                if(mapTiles[i] || outOfBounds(x, y)) ctx.fillRect(x, y, 1, 1);
+                if(mapTiles[i] || outOfBounds(x, y)) {
+                    drawTile(x, y);
+                }else{
+                    drawSpace(x, y);
+                }
             }
             ctx.resetTransform();
 
             if(loader.delay) {
                 var alpha = (1 - (loader.delay)/100) * .5;
-                let color = `rgb(120, 120, 120, ${alpha})`;
-                ctx.fillStyle = color;
+                let octx = loader.ctx;
+                loader.canvas.width = innerWidth;
+                // let color = `rgb(120, 120, 120, ${alpha})`;
+                // ctx.fillStyle = color;
                 game.scale();
+                game.scale(octx);
+                octx.fillStyle = ctx.fillStyle;
                 for(let x = 0; x < game.w; x++) for(let y = 0; y < game.h; y++)
                 {
                     let i = Index(x, y);
-                    if(loader.tiles[i]) ctx.fillRect(x, y, 1, 1);
+                    if(loader.tiles[i]) drawTile(x, y, loader.tiles, octx);
+                    else drawSpace(x, y, loader.tiles, octx);
                 }
                 for(let blob of loader.enemies) {
                     blob.step(loader.tiles);
                     blob.update(1 - (loader.delay)/100, loader.tiles);
-                    blob.drawWith({alpha});
+                    blob.draw(octx);
                 }
+                ctx.resetTransform();
+                octx.resetTransform();
                 --loader.delay;
                 if(loader.delay == 50) {
                     mapTiles = [];
@@ -838,6 +1042,9 @@ var TIME = 0;
                 if(loader.delay == 0) {
                     loader.load();
                 }
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(loader.canvas, 0, 0);
+                ctx.globalAlpha = 1;
             }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
                 startLevel();
             }
@@ -1298,7 +1505,7 @@ function Binary(hex) {
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
-        draw() 
+        draw(ctx=game.ctx)
         {
             var {x, y, s, alpha=1} = this;
             var r = atan(this.vy, this.vx);
@@ -1306,7 +1513,7 @@ function Binary(hex) {
             ctx.lineWidth = 0.05;
             ctx.globalAlpha = alpha;
             ctx.fillStyle = this.color;
-            game.zoom(x, y, s, s, r);
+            game.zoom(x, y, s, s, r, 0, 0, ctx);
             ctx.save();
             if(this.hp != this.xhp) {
                 ctx.beginPath();

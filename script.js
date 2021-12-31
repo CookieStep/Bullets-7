@@ -13,8 +13,9 @@ var panSpeed = 0.2;
 var zoomSpeed = 0.1;
 var level = 0;
 var player;
-var creator;
+var creator = window.creator;
 var edit;
+var DEAD = 10;
 
 var loader = {
     load() {
@@ -792,7 +793,10 @@ var TIME = 0;
             if(keys.use("Space")) {
                 if(player.remove) {
                     --level;
+                    mapTiles = [];
                     player.remove = false;
+                    player.dead = 0;
+                    player.hp = 1;
                     enemies = [player];
                 }
             }
@@ -813,7 +817,8 @@ var TIME = 0;
             ctx.resetTransform();
 
             if(loader.delay) {
-                let color = `rgb(255, 85, 85, ${(1 - (loader.delay)/100)})`;
+                var alpha = (1 - (loader.delay)/100) * .5;
+                let color = `rgb(120, 120, 120, ${alpha})`;
                 ctx.fillStyle = color;
                 game.scale();
                 for(let x = 0; x < game.w; x++) for(let y = 0; y < game.h; y++)
@@ -822,15 +827,15 @@ var TIME = 0;
                     if(loader.tiles[i]) ctx.fillRect(x, y, 1, 1);
                 }
                 for(let blob of loader.enemies) {
-                    blob.step();
+                    blob.step(loader.tiles);
                     blob.update(1 - (loader.delay)/100, loader.tiles);
-                    blob.drawWith({color})
+                    blob.drawWith({alpha});
                 }
                 --loader.delay;
                 if(loader.delay == 0) {
                     loader.load();
                 }
-            }else if(enemies.length == 1) {
+            }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
                 startLevel();
             }
 
@@ -855,14 +860,14 @@ var TIME = 0;
                                 blob.remove = true;
                                 them.remove = true;
                             }
+                            if(Entity.hitTest(blob, them)) {
+                                blob.hit(them);
+                                them.hit(blob);
+                            }
                             if(Entity.collTest(blob, them)) {
                                 Entity.collide(blob, them);
                                 blob.lcoll.set(them, 7);
                                 them.lcoll.set(blob, 7);
-                            }
-                            if(Entity.hitTest(blob, them)) {
-                                blob.hit(them);
-                                them.hit(blob);
                             }
                         }
                     }
@@ -903,6 +908,7 @@ var TIME = 0;
             return shapes[name];
         }
     };
+    shape("square", ctx => ctx.rect(0, 0, 1, 1));
     shape("square", ctx => ctx.rect(0, 0, 1, 1));
     shape("square.4", ctx => {
         var r = .4;
@@ -946,7 +952,8 @@ function Binary(hex) {
     var Entity = class Entity
     {
         register(enemy) {}
-        onCollide() {}
+        onCollide() {
+        }
         clipSight() {
             let rads = [];
             let dis = 50;
@@ -1069,7 +1076,9 @@ function Binary(hex) {
             this.oy = this.y;
             this.vx *= this.f;
             this.vy *= this.f;
-            this.tick?.();
+            if(!this.dead) this.tick?.(tiles);
+            if(this.dead) ++this.dead;
+            if(this.dead >= DEAD) this.remove = 1;
             if(this.wallInv > 0) {
                 if(!this.inWall(0, tiles)) {
                     this.wallInv = 0;
@@ -1078,6 +1087,7 @@ function Binary(hex) {
         }
         update(m=1, tiles=mapTiles)
         {
+            if(this.remove) return;
             this.sx = this.x;
             this.sy = this.y;
             this.movement(m, tiles);
@@ -1096,6 +1106,7 @@ function Binary(hex) {
         }
         move(rad, spd=1)
         {
+            if(this.dead) return;
             spd *= this.spd;
             var c = cos(rad),
                 s = sin(rad);
@@ -1144,19 +1155,23 @@ function Binary(hex) {
                 this.vy = abs(this.vy) * y;
             }
         }
-        inWall(a, tiles=mapTiles) {
+        wallCheck(a, tiles=mapTiles) {
+            var w = this.w || this.s;
+            var h = this.h || this.s;
             if(a) {
                 if(this.wallInv) return;
                 var o = a == "x"? "y": "x";
                 var n = ["x", "y"].indexOf(a);
                 var va = "v" + a;
+                // if(a == "x") s = w;
+                // else var s = h;
                 var ma = this[a] - this["o"+a];
             }
             var sx = floor(this.x);
             var sy = floor(this.y);
-            var bx = floor(this.x + this.s);
-            var by = floor(this.y + this.s);
-            
+            var bx = floor(this.x + w);
+            var by = floor(this.y + h);
+
             ([sx, sy, bx, by] = [[sx, game.w], [sy, game.h], [bx, game.w], [by, game.h]].map(([n, m]) => {
                 if(n < 0) return 0;
                 if(n >= m-1) return m-1;
@@ -1195,6 +1210,52 @@ function Binary(hex) {
             }
             return total;
         }
+        inWall(a, tiles) {
+            if(this.s > 1) {
+                var wall = false;
+                var s = this.s;
+                var box = {x: 0, y: 0, vx: this.vx, vy: this.vy, w: 1, h: 1};
+                {
+
+                    box.hitWall = (x, y) => {
+                        var sx = floor(Bx);
+                        var sy = floor(By);
+                        var bx = floor(Bx + box.w);
+                        var by = floor(By + box.h);
+                        var n = ["x", "y"].indexOf(a);
+                        if(a) {
+                            if(this["v"+a] > 0) { //down
+                                this[a] = [sx, sy][n] + (1 - this.s - 0.01);
+                                if(a == "x") this.hitWall(-1, 0);
+                                else if(a == "y") this.hitWall(0, -1);
+                            }else{//up
+                                this[a] = box[a];
+                                if(a == "x") this.hitWall(1, 0);
+                                else if(a == "y") this.hitWall(0, 1);
+                            }
+                        }
+                        // this.hitWall(x, y);
+                    };
+                }
+                for(var ox = 0; ox < s; ox++) for(var oy = 0; oy < s; oy++) {
+                    box.x = this.x + ox;
+                    box.y = this.y + oy;
+
+                    var Bx = box.x;
+                    var By = box.y;
+
+                    if(ox + 1 > s) {
+                        box.w = s - ox;
+                    }else box.w = 1;
+                    if(oy + 1 > s) {
+                        box.h = s - oy;
+                    }else box.h = 1;
+
+                    let res = this.wallCheck.call(box, a, tiles);
+                    if(res) return;
+                }
+            }else return this.wallCheck(a, tiles);
+        }
         static collTest(a, b)
         {
             if(a.nocoll & b.team || b.nocoll & a.team) return 0;
@@ -1205,19 +1266,34 @@ function Binary(hex) {
         {
             if(a.inv?.has(b)) return;
             if(b.inv?.has(a)) return;
+            if(a.dead || a.remove) return;
+            if(b.dead || b.remove) return;
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
         draw() 
         {
-            var {x, y, s} = this;
+            var {x, y, s, alpha=1} = this;
             var r = atan(this.vy, this.vx);
 
-            ctx.lineWidth = 0.07;
-            ctx.strokeStyle = "red";
+            ctx.lineWidth = 0.05;
+            ctx.globalAlpha = alpha;
             ctx.fillStyle = this.color;
             game.zoom(x, y, s, s, r);
+            ctx.save();
+            if(this.hp != this.xhp) {
+                ctx.beginPath();
+                ctx.moveTo(.5, .5);
+                ctx.arc(.5, .5, 10, 0, PI2 * this.hp/this.xhp);
+                ctx.closePath();
+                ctx.clip();
+            }
             ctx.fill(shape(this.shape));
+            ctx.restore();
+            ctx.strokeStyle = this.color;
+            ctx.stroke(shape(this.shape));
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = "red";
             // for(let {x, y, s} of this.boxes) {
             //     game.zoom(x, y, s, s);
             //     ctx.strokeRect(0, 0, 1, 1);
@@ -1323,7 +1399,7 @@ function Binary(hex) {
             var nx = (b.x - a.x + s)/d;
             var ny = (b.y - a.y + s)/d;
 
-            var p = 2.4 * (nx * kx + ny * ky)/(b.m + a.m);
+            var p = 2.2 * (nx * kx + ny * ky)/(b.m + a.m);
             a.vx = a.vx - p * b.m * nx;
             a.vy = a.vy - p * b.m * ny;
             b.vx = b.vx + p * a.m * nx;
@@ -1346,8 +1422,12 @@ function Binary(hex) {
         hit(who) {
             who.onHit(this.atk, this);
         }
-        onHit(atk, who) {
-            this.remove = true;
+        onHit(atk=0, who) {
+            this.hp -= atk;
+            if(this.hp <= 0) {
+                this.dead = 1;
+                this.m /= 10;
+            }
         }
         boxes = [this];
         shape = "square";
@@ -1360,8 +1440,11 @@ function Binary(hex) {
         stepf = 0;
         m = 1; b = 1;
         wallInv = 0;
-        atk = 1;
+        atk = 1; hp = 1;
+        xhp = 1;
+        dead = 0;
         lcoll = new Map;
+        s = 0.4;
     }
 }
 var TEAM = {
@@ -1574,7 +1657,7 @@ var TEAM = {
             this.move(this.r);
         }
     }
-    var Bullet = class Bullet extends Mover{
+    var Bullet = class Bullet extends Stuck{
         constructor(parent, r) {
             super(r);
             this.parent = parent;
@@ -1590,12 +1673,18 @@ var TEAM = {
             else this.remove = true;
         }
         hitWall(a, b) {
+            // var {x, y} = this;
+            // this.points.push({x, y});
+            // super.hitWall(a, b);
+            this.remove = true;
+        }
+        onHit(atk, who) {
+            this.remove = true;
             var {x, y} = this;
             this.points.push({x, y});
-            super.hitWall(a, b);
         }
-        onHit(atk, who) {}
         onCollide() {
+            if(this.remove) return;
             var {sx: x, sy: y} = this;
             this.points.push({x, y});
         }
@@ -1653,6 +1742,7 @@ var TEAM = {
             what.y = parent.y + ps/2 - what.s/2 + s * ps;
         }
         s = 0.2;
+        m = 0.1;
     };
     var Wall = class Wall extends Mover{
         tick(tiles=mapTiles) {
@@ -1717,32 +1807,53 @@ var TEAM = {
             }
             var rad = atan(this.vy, this.vx);
             var cho = -1;
-            if(options.size > 1) {
-                var obj = {};
-                options.forEach(r => {
-                    obj[r] = PI - abs(rDis(rad, r));
-                });
-                // console.log(rad, obj);
-                cho = weight(obj);
+            if(options.has(this.last)) {
+                cho = this.last;
+                --this.lastT;
+                if(!this.lastT) {
+                    delete this.last;
+                    delete this.lastT;
+                }
                 this.move(cho);
-            }else if(options.size == 1) {
-                cho = randomOf(options);
-                this.move(cho);
-            }else if(this.arr) {
-                var {arr} = this;
-                options.clear();
-                if(arr[0]) options.add(P*3);
-                if(arr[1]) options.add(P);
-                if(arr[2]) options.add(PI);
-                if(arr[3]) options.add(0);
-                cho = randomOf(options);
-                if(cho) {
-                    this.move(cho);
-                    this.arr = arr;
-                }else this.move(rad);
             }else{
-                this.move(rad);
+                delete this.last;
+                delete this.lastT;
+                // if(!isNaN(this.cho) && options.size > 1) {
+                //     options.delete(loop(this.cho + PI, PI2));
+                // }
+                if(options.size > 1) {
+                    var obj = {};
+                    options.forEach(r => {
+                        obj[r] = sqrt(PI - abs(rDis(rad, r)));
+                    });
+                    // console.log(rad, obj);
+                    cho = weight(obj);
+                    if(options.size > 2) {
+                        this.last = cho;
+                        this.lastT = 40;
+                    }
+                    this.move(cho);
+                }else if(options.size == 1) {
+                    cho = randomOf(options);
+                    this.move(cho);
+                }else if(this.arr) {
+                    var {arr} = this;
+                    options.clear();
+                    if(arr[0]) options.add(P*3);
+                    if(arr[1]) options.add(P);
+                    if(arr[2]) options.add(PI);
+                    if(arr[3]) options.add(0);
+                    cho = randomOf(options);
+                    if(cho) {
+                        this.move(cho);
+                        this.last = cho;
+                        this.arr = arr;
+                    }else this.move(rad);
+                }else{
+                    this.move(rad);
+                }
             }
+            this.cho = cho;
             var a = false;
             var b = false;
             for(let cho of options) {
@@ -1765,6 +1876,10 @@ var TEAM = {
                     this.vx *= 0.2;
                 }
             }
+        }
+        onCollide() {
+            delete this.last;
+            delete this.cho;
         }
         color = "#f5f";
     }
@@ -2004,6 +2119,72 @@ var TEAM = {
         }
     }
 }
+{
+    var Boss = class Boss extends Mover{
+        nocoll = TEAM.BAD;
+        hp = 10;
+        xhp = 10;
+        s = 1;
+        m = 0.1;
+        time = 0;
+        phase = 2;
+        isPlayer(what) {
+            return (what.team & TEAM.GOOD) && !(what.team & TEAM.BULLET);
+        }
+        step() {
+            super.step();
+            delete this.target;
+        }
+        register(what) {
+            if(!this.isPlayer(what)) return;
+            this.target = what;
+        }
+        onHit(atk, who) {
+            super.onHit(atk, who);
+            if(this.phase == 0) {
+                ++this.phase;
+                this.time = 0;
+                this.color = "#f95";
+            }
+            else if(this.phase == 1) {
+                this.phase = 2;
+                this.color = "#ff5";
+            }
+            else if(this.phase == 2) {
+                this.phase = 0;
+                this.color = "#d00";
+            }
+        }
+        tick() {
+            var {target} = this;
+            switch(this.phase) {
+                case 0:if(target) {
+                    var rad = Entity.radian(this, target);
+                    this.move(rad);
+                }break;
+                case 1:
+                    ++this.time;
+                    if(this.time >= 50) {
+                        for(let i = 0; i < 4; i++) {
+                            let r = PI*.5*i;
+                            var blob = new Mover();
+                            blob.color = this.color;
+                            Bullet.position(blob, r, this);
+                            blob.nocoll = TEAM.BAD;
+                            enemies.push(blob);
+                        }
+                        ++this.phase;
+                        this.time = 0;
+                        this.color = "#ff5";
+                    }
+                break;
+                case 2:
+                    super.tick();
+                break;
+            }
+        }
+    }
+}
 {//levels.js
     var startLevel = function startLevel() {
         var obj = levels[level];
@@ -2044,5 +2225,8 @@ var TEAM = {
     }, {
         tiles: "01000201c47008000000201c4700800100",
         spawn: [5, Wall, 5, Mover]
+    }, {
+        tiles: "0000202040400000100000040408080000",
+        spawn: [Boss]
     }]
 };

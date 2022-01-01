@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.6";
+const gameVersion = "0.0.7";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -1058,10 +1058,11 @@ var TIME = 0;
 
         if(loader.delay) {
             var alpha = (1 - (loader.delay)/loader.time) * .5;
-            let octx = loader.ctx;
+            // let octx = loader.ctx;
+            let octx = ctx;
             // octx.globalCompositeOperation = "destination-out";
             // octx.fillStyle = "black";
-            octx.clearRect(0, 0, game.width, game.height);
+            // octx.clearRect(0, 0, game.width, game.height);
             // octx.globalCompositeOperation = "source-over";
             // loader.canvas.width = innerWidth;
             // let color = `rgb(120, 120, 120, ${alpha})`;
@@ -1071,8 +1072,9 @@ var TIME = 0;
                 game._x += game.w * 2 * loader.dir * (loader.delay)/loader.time;
                 alpha = 1;
             }
+            octx.globalAlpha = alpha;
             game.scale();
-            game.scale(octx);
+            // game.scale(octx);
             octx.fillStyle = loader.color2(game.w, game.h, scale/game.zoomL);
             octx.fillRect(0, 0, game.w, game.h);
             octx.fillStyle = loader.color(game.w, game.h, scale/game.zoomL);
@@ -1086,7 +1088,7 @@ var TIME = 0;
             for(let blob of loader.enemies) {
                 blob.step(loader.tiles);
                 blob.update(1 - (loader.delay)/100, loader.tiles);
-                blob.draw(octx);
+                blob.drawWith(octx, {alpha});
             }
             game._x = gx;
             ctx.resetTransform();
@@ -1098,8 +1100,8 @@ var TIME = 0;
             if(loader.delay == 0) {
                 loader.load();
             }
-            ctx.globalAlpha = alpha;
-            ctx.drawImage(loader.canvas, 0, 0);
+            // ctx.globalAlpha = alpha;
+            // ctx.drawImage(loader.canvas, 0, 0);
             ctx.globalAlpha = 1;
         }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
             startLevel();
@@ -1354,9 +1356,10 @@ function Binary(hex) {
             ctx.fill();
             ctx.resetTransform();
         }
-        drawWith(obj) {
+        drawWith(ctx, obj) {
             obj = {...this, ...obj};
-            this.draw.call(obj);
+            obj.pen = this.pen;
+            this.draw.call(obj, ctx);
         }
         spawn(tiles=mapTiles)
         {
@@ -1638,6 +1641,16 @@ function Binary(hex) {
                 && b.y + b.s > a.y
         }
         sightCheck(blob) {
+            var s = this.s * .5;
+            var sx = this.x + s;
+            var sy = this.y + s;
+            var s = blob.s * .5;
+            var ex = blob.x + s;
+            var ey = blob.y + s;
+            var hit = Test.lineCheck(sx, sy, ex, ey);
+            return !hit;
+        }
+        sightCheckOLD(blob) {
             ctx.scale(scale, scale);
             var s = this.s * .5;
             var sx = this.x + s;
@@ -1921,8 +1934,8 @@ var TEAM = {
             if(!target) return;
             var rad = Entity.radian(this, target);
             var d = rDis(this.r, rad);
-            var m = 0.1;
-            if(d < m) this.r = rad;
+            var m = 0.2;
+            if(abs(d) < m) this.r = rad;
             else this.r += m * sign(d);
 
             this.skill(this.r);
@@ -1951,15 +1964,15 @@ var TEAM = {
         }
         m = 10;
         register(enemy) {
-            if(!this.sightCheck(enemy)) return;
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.distance(this, enemy);
             var d = 7;
-            if(dis < d && (dis < this.clo || !this.clo)) {
-                var {x, y, s} = enemy;
-                this.target = {x, y, s};
-                this.clo = dis;
-            }
+            var a = dis < d && (dis < this.clo || !this.clo);
+            if(!a) return;
+            if(!this.sightCheck(enemy)) return;
+            var {x, y, s} = enemy;
+            this.target = {x, y, s};
+            this.clo = dis;
         }
         draw(ctx) {
             var r = this.r;
@@ -1970,7 +1983,7 @@ var TEAM = {
     }
     var Test = class Test extends Enemy
     {
-        static lineCheck(sx, sy, ex, ey, infinite)
+        static lineCheck(sx, sy, ex, ey, tiles=mapTiles)
         {
             var dx = ex - sx;
             var dy = ey - sy;
@@ -1999,7 +2012,7 @@ var TEAM = {
                 // ctx.fillRect(x, y, 1, 1);
                 // ctx.globalAlpha = 1;
 
-                if(mapTiles[Index(x, y)] || outOfBounds(x, y)) {
+                if(tiles[Index(x, y)] || outOfBounds(x, y)) {
                     var dis = dist(px - sx, py - sy) + 0.0001;
                     see = dis;
                     break;
@@ -2417,7 +2430,6 @@ var TEAM = {
             super();
             this.brainPoints = [];
             this.rad = random(PI2);
-            this.spd *= .5;
         }
         brainMove() {
             var lines = [];
@@ -2455,7 +2467,7 @@ var TEAM = {
             this.brainPoints = [];
         }
         wander = .5;
-        tick() {
+        tick(tiles) {
             this.rad += (srand() - .5)/4;
             this.brainPoints.push([this.rad, this.wander]);
             var lx = this.x + this.s;
@@ -2471,7 +2483,7 @@ var TEAM = {
             for(let i = 0; i < 16; i++) {
                 var c = cos(o * i) * d;
                 var s = sin(o * i) * d;
-                var dis = Test.lineCheck(mx, my, mx + c, my + s);
+                var dis = Test.lineCheck(mx, my, mx + c, my + s, tiles);
                 if(dis && dis < d) {
                     // ctx.scale(scale, scale);
                     // ctx.lineWidth = 0.1;
@@ -2529,38 +2541,72 @@ var TEAM = {
         color = "#ccc";
     }
     var Chaser = class Chaser extends Brain{
-        color = "#f5a";
         wander = .5;
-        tick() {
+        shape = 'square.4';
+        color = "#666";
+        color2 = "#fa5";
+        draw = Turret.prototype.draw;
+        tick(tiles) {
+            this.r = this.rad;
             var enemy = this.target;
+            this.wander = .5;
             if(enemy) {
-                var dis = Entity.distance(this, enemy);
-                var d = 15;
-                var n = (dis - d)/-d;
-                var rad = Entity.radian(this, enemy);
-                n **= .5;
-                this.brainPoints.push([rad, n]);
+                if(!enemy.c) {
+                    var dis = Entity.distance(this, enemy);
+                    this.clo = dis;
+                    var d = 15;
+                    if(dis < d) {
+                        var n = (dis - d)/-d;
+                        var rad = Entity.radian(this, enemy);
+                        n **= .5;
+                        this.brainPoints.push([rad, n]);
+                    }
+                    if(dis < .15) {
+                        enemy.c = 1;
+                    }
+                    this.wander = .1;
+                }else{
+                    this.wander = 1;
+                }
+                if(enemy.time > 49) {
+                    this.clo = 15;
+                }
                 --enemy.time;
-                if(!enemy.time || dis < .2)
+                if(!enemy.time || dis > d)
                 {
                     delete this.target;
+                    delete this.clo;
                 }
             }
-            if(this.target) {
-                if(this.target.time >= 99) this.color = "red";
-                else this.color = "yellow";
-            }else this.color = "green";
-            super.tick();
+            // if(this.target) {
+            //     if(this.target.time >= 99) this.color = "red";
+            //     else this.color = "yellow";
+            // }else this.color = "green";
+            super.tick(tiles);
         }
         register(enemy) {
-            if(!this.sightCheck(enemy)) return;
-            // if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
+            if((this.team & enemy.team) && !(enemy.team & TEAM.BULLET)) {
+                var dis = Entity.distance(this, enemy);
+                var d = (enemy.s + this.s)*1.5;
+                var a = dis < d;
+                if(!a) return;
+                // if(!this.sightCheck(enemy)) return;
+                if(dis < d) {
+                    var n = (dis - d)/-d;
+                    var rad = Entity.radian(this, enemy);
+                    n **= 2;
+                    this.brainPoints.push([rad, -n]);
+                }
+            }
+            if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.distance(this, enemy);
             var d = 10;
-            if(dis < d) {
-                var {x, y, s} = enemy;
-                this.target = {x, y, s, time: 100};
-            }
+            var a = dis < d && (dis < this.clo || !this.clo);
+            if(!a) return;
+            if(!this.sightCheck(enemy)) return;
+            var {x, y, s} = enemy;
+            this.target = {x, y, s, time: 50};
+            this.clo = dis;
         }
     }
 }
@@ -2617,7 +2663,7 @@ var TEAM = {
                 }break;
                 case 1:
                     ++this.time;
-                    if(this.time >= 40) {
+                    if(this.time >= 30) {
                         for(let i = 0; i < 4; i++) {
                             let r = PI*.5*i;
                             var blob = new Mover();
@@ -2785,8 +2831,8 @@ var TEAM = {
         draw();
         var test = {
             world: {
-                spawn: [5, Turret],
-                tiles: "01000201c47008000000201c4700800100",
+                tiles: "01000001fbf0140fabe0501fbf00000100",
+                spawn: [5, Turret, 5, Chaser]
             },
             name: "World 2",
             levels: [{
@@ -2795,6 +2841,12 @@ var TEAM = {
             }, {
                 tiles: "00002521fbf080810102021fbf09480000",
                 spawn: [10, Turret]
+            }, {
+                tiles: "00000000f1f022004400880f1f00000000",
+                spawn: [5, Turret, 5, Chaser]
+            }, {
+                tiles: "01000001fbf0140fabe0501fbf00000100",
+                spawn: [10, Turret, 10, Chaser]
             }],
             color2: (w, h, z) => {
                 let col = ctx.createPattern(canv, "repeat");
@@ -2851,8 +2903,8 @@ var TEAM = {
         var h = game.height/10;
         ctx.font = `${h/2}px Josefin Sans`;
         var label = wrld.name;
-        var c1 = wrld.color(game.width, game.height, game.zoomL);
-        var c2 = wrld.color2(game.width, game.height, game.zoomL);
+        var c1 = wrld.color(game.width, game.height, 1);
+        var c2 = wrld.color2(game.width, game.height, 1);
         var wid = ctx.measureText(label).width;
         {
             let w = wid * 1.5;

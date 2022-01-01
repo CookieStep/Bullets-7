@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.7";
+const gameVersion = "0.0.8";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -17,8 +17,8 @@ var edit;
 var DEAD = 10;
 
 {
-    let canv = document.createElement("canvas");
-    let octx = canv.getContext("2d");
+    // let canv = document.createElement("canvas");
+    // let octx = canv.getContext("2d");
     var loader = {
         load() {
             mapTiles = this.tiles;
@@ -53,8 +53,8 @@ var DEAD = 10;
                 this.dir = 0;
             }
         },
-        canvas: canv,
-        ctx: octx,
+        // canvas: canv,
+        // ctx: octx,
         enemies: [],
         tiles: [],
         delay: 0
@@ -614,8 +614,8 @@ var DEAD = 10;
         game.height = innerHeight;
         canvas.height = game.height;
         canvas.width = game.width;
-        loader.canvas.height = game.height;
-        loader.canvas.width = game.width;
+        // loader.canvas.height = game.height;
+        // loader.canvas.width = game.width;
 
         rescale();
 
@@ -825,6 +825,9 @@ var TIME = 0;
         }catch(err) {console.error(err)}
     }
     var world = function world() {
+        if(TIME % 100 == 0) {
+            onresize();
+        }
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, innerWidth, innerHeight);
 
@@ -1186,6 +1189,21 @@ var TIME = 0;
         ctx.lineTo(0, 1);
         ctx.lineTo(0, 0);
         ctx.closePath();
+    });
+    shape("pointer", path => {
+        var mid = 1/2;
+        var top = 2/10;
+        var btm = 8/10;
+        // var spl = 1/2;
+        var wid = 14/16;
+        // var spr = 11/16;
+        path.moveTo(mid, top);
+        path.lineTo(wid, btm);
+        // spr = 1 - spr;
+        wid = 1 - wid;
+        path.lineTo(wid, btm);
+        path.closePath();
+        path.rotation = PI / 2;
     });
     shape("square.3", ctx => {
         var r = .3;
@@ -1625,12 +1643,12 @@ function Binary(hex) {
         }
         static distance = (a, b) =>
         {
-            var s = (a.s - b.s)/2;
+            var s = (a.s - b.s)*.5;
             return dist(a.y - b.y + s, a.x - b.x + s);
         }
         static rawDistance = (a, b) =>
         {
-            var s = (a.s - b.s)/2;
+            var s = (a.s - b.s)*.5;
             return (a.y - b.y + s) ** 2 + (a.x - b.x + s) ** 2;
         }
         static hitbox(a, b)
@@ -1931,6 +1949,7 @@ var TEAM = {
     };
     var Turret = class Turret extends Enemy{
         shape = 'square.4';
+        shape2 = 'pointer';
         color = "#666";
         color2 = "#ff5";
         tick() {
@@ -1982,9 +2001,10 @@ var TEAM = {
         }
         draw(ctx) {
             var r = this.r;
+            var o = PI*.5;
             this.pen(ctx, {fill: this.color, r}, 0);
             this.pen(ctx, {stroke: this.color, r});
-            this.pen(ctx, {fill: this.color2, stroke: this.color2, r, scale: .5}, 0);
+            this.pen(ctx, {shape: this.shape2, fill: this.color2, stroke: this.color2, r: r+o, scale: .5}, o);
         }
     }
     var Test = class Test extends Enemy
@@ -2440,7 +2460,7 @@ var TEAM = {
         brainMove() {
             var lines = [];
             var max;
-            var add = (PI * 2)/64;
+            var add = (PI * 2)/16;
             for(let a = 0; a < PI * 2; a += add) {
                 var num = 0;
                 for(let [rad, pow] of this.brainPoints) {
@@ -2484,9 +2504,9 @@ var TEAM = {
 
             var d = 3;
             var p = 5;
-            var o = PI * .125;
+            var o = PI * .25;
 
-            for(let i = 0; i < 16; i++) {
+            for(let i = 0; i < 8; i++) {
                 var c = cos(o * i) * d;
                 var s = sin(o * i) * d;
                 var dis = Test.lineCheck(mx, my, mx + c, my + s, tiles);
@@ -2501,7 +2521,7 @@ var TEAM = {
                     // ctx.resetTransform();
                     var n = (dis - d)/-d;
                     n **= p;
-                    this.brainPoints.push([o * i, -n * .2]);
+                    this.brainPoints.push([o * i, -n * .5]);
                 }
             }
             this.brainMove();
@@ -2560,7 +2580,7 @@ var TEAM = {
             this.wander = .5;
             if(enemy) {
                 if(!enemy.c) {
-                    var dis = Entity.distance(this, enemy);
+                    var dis = Entity.rawDistance(this, enemy);
                     this.clo = dis*dis;
                     var d = 15;
                     if(dis < d*d) {
@@ -2871,7 +2891,7 @@ var TEAM = {
         }
     }
     let worlds = [tutorial, test];
-    let selectedWorld = 1;
+    let selectedWorld = 0;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;

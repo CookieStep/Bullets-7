@@ -1,17 +1,16 @@
 "use strict";
-const gameVersion = "0.0.4";
+const gameVersion = "0.0.5";
 const RUN_KEY = Symbol();
 
 var bullets = [];
 var enemies = [];
-// const mapSize = 21;
 
 var lockToEdges = false;
 var cameraState = "";
 var zoomLevel = 2;
 var panSpeed = 0.2;
 var zoomSpeed = 0.1;
-var level = 0;
+var level = 1;
 var player;
 var creator = window.creator;
 var edit;
@@ -23,6 +22,7 @@ var DEAD = 10;
     var loader = {
         load() {
             mapTiles = this.tiles;
+            if(worldSelect.active) enemies = [];
             for(let enemy of enemies) {
                 if(enemy.inWall() && !enemy.wallInv) {
                     enemy.wallInv = 1;
@@ -30,7 +30,8 @@ var DEAD = 10;
             }
             this.delay = 0;
             var arr = [];
-            for(let blob of this.enemies) {
+            if(worldSelect.active) enemies = this.enemies;
+            else for(let blob of this.enemies) {
                 var hit = false;
                 for(let them of enemies) {
                     if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
@@ -45,8 +46,11 @@ var DEAD = 10;
                 this.enemies = arr;
                 this.delay = 1;
             }else{
+                game.color = this.color;
+                game.color2 = this.color2;
                 this.tiles = [];
                 this.enemies = [];
+                this.dir = 0;
             }
         },
         canvas: canv,
@@ -446,58 +450,17 @@ var DEAD = 10;
         },
         camera() {
             delete this.zoomO;
-            if(cameraState == "screen") {
-                let s = 1/scale;
-                game.x = (game.w - (innerWidth * s)) * -.5;
-                game.y = (game.h - (innerHeight * s)) * -.5;
-                this.zoooO = 1;
-            }
-            if(cameraState == "player") {
-                let s = 1/scale;
-                game.x = (game.zw - (innerWidth * s)) * -.5;
-                game.y = (game.zh - (innerHeight * s)) * -.5;
-                // var player = enemies[0];
-                s = player.s * .5;
-                game.x += game.zw * .5 - player.x - s;
-                game.y += game.zh * .5 - player.y - s;
-            }
-            if(cameraState == "mouse") {
-                let s = 1/scale;
-                game.x = (game.zw - (innerWidth * s)) * -.5;
-                game.y = (game.zh - (innerHeight * s)) * -.5;
+            if(worldSelect.active) {
+                let p = 2;
 
-                // var player = enemies[0];
-                s = player.s * .5;
-                game.x += game.zw * .5 - player.x - s;
-                game.y += game.zh * .5 - player.y - s;
+                minX = -p;
+                maxX = game.w + p;
+                minY = -p;
+                maxY = game.h + p;
 
-                let {x, y} = mouse;
-                x -= innerWidth/2;
-                y -= innerHeight/2;
-                x = x/scale;
-                y = y/scale;
-                game.x -= x;
-                game.y -= y;
-            }
-            if(cameraState == "auto") {
-                let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.dead ||blob.remove || (blob.team & TEAM.BULLET)));
-                let p = 1;
-                if(loader.delay > 1 || !arr.length) {
-                    minX = -p;
-                    maxX = game.w + p;
-                    minY = -p;
-                    maxY = game.h + p;
-                }else{
-                    var xa = arr.map(blob => blob.x + blob.s*.5);
-                    var ya = arr.map(blob => blob.y + blob.s*.5);
-                    var minX = min(...xa) - p;
-                    var maxX = max(...xa) + p;
-                    var minY = min(...ya) - p;
-                    var maxY = max(...ya) + p;
-                }
                 var zoomX = game.w/(maxX - minX);
                 var zoomY = game.h/(maxY - minY);
-                var zoomLevel = min(zoomX, zoomY);
+                let zoomLevel = min(zoomX, zoomY);
                 if(zoomLevel < 0.5) zoomLevel = 0.5;
                 if(zoomLevel > 2) zoomLevel = 2;
                 this.zoomO = zoomLevel;
@@ -510,24 +473,90 @@ var DEAD = 10;
                 // s = player.s * .5;
                 game.x += game.zw * .5 - px;
                 game.y += game.zh * .5 - py;
-            }
-            if(lockToEdges) {
-                var sw = innerWidth/scale;
-                if(sw >= game.w) {
-                    game.x = (game.w - sw) * -.5;
-                }else{
-                    let m = sw - game.w;
-                    if(game.x > 0) game.x = 0;
-                    if(game.x < m) game.x = m;
+            }else{
+                if(cameraState == "screen") {
+                    let s = 1/scale;
+                    game.x = (game.w - (innerWidth * s)) * -.5;
+                    game.y = (game.h - (innerHeight * s)) * -.5;
+                    if(zoomLevel > 1) this.zoomO = 1;
                 }
-                var sh = innerHeight/scale;
-                if(sh >= game.h) {
-                    game.y = (game.h - sh) * -.5;
-                }else{
-                    let m = sh - game.h;
-                    if(game.y > 0) game.y = 0;
-                    if(game.y < m) game.y = m;
-                    
+                if(cameraState == "player") {
+                    let s = 1/scale;
+                    game.x = (game.zw - (innerWidth * s)) * -.5;
+                    game.y = (game.zh - (innerHeight * s)) * -.5;
+                    // var player = enemies[0];
+                    s = player.s * .5;
+                    game.x += game.zw * .5 - player.x - s;
+                    game.y += game.zh * .5 - player.y - s;
+                }
+                if(cameraState == "mouse") {
+                    let s = 1/scale;
+                    game.x = (game.zw - (innerWidth * s)) * -.5;
+                    game.y = (game.zh - (innerHeight * s)) * -.5;
+
+                    // var player = enemies[0];
+                    s = player.s * .5;
+                    game.x += game.zw * .5 - player.x - s;
+                    game.y += game.zh * .5 - player.y - s;
+
+                    let {x, y} = mouse;
+                    x -= innerWidth/2;
+                    y -= innerHeight/2;
+                    x = x/scale;
+                    y = y/scale;
+                    game.x -= x;
+                    game.y -= y;
+                }
+                if(cameraState == "auto") {
+                    let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.dead ||blob.remove || (blob.team & TEAM.BULLET)));
+                    let p = 1;
+                    if(loader.delay > 1 || !arr.length) {
+                        minX = -p;
+                        maxX = game.w + p;
+                        minY = -p;
+                        maxY = game.h + p;
+                    }else{
+                        var xa = arr.map(blob => blob.x + blob.s*.5);
+                        var ya = arr.map(blob => blob.y + blob.s*.5);
+                        var minX = min(...xa) - p;
+                        var maxX = max(...xa) + p;
+                        var minY = min(...ya) - p;
+                        var maxY = max(...ya) + p;
+                    }
+                    var zoomX = game.w/(maxX - minX);
+                    var zoomY = game.h/(maxY - minY);
+                    let zoomLevel = min(zoomX, zoomY);
+                    if(zoomLevel < 0.5) zoomLevel = 0.5;
+                    if(zoomLevel > 2) zoomLevel = 2;
+                    this.zoomO = zoomLevel;
+                    var px = (minX + maxX)*.5;
+                    var py = (minY + maxY)*.5;
+
+                    let s = 1/scale;
+                    game.x = (game.zw - (innerWidth * s)) * -.5;
+                    game.y = (game.zh - (innerHeight * s)) * -.5;
+                    // s = player.s * .5;
+                    game.x += game.zw * .5 - px;
+                    game.y += game.zh * .5 - py;
+                }
+                if(lockToEdges) {
+                    var sw = innerWidth/scale;
+                    if(sw >= game.w) {
+                        game.x = (game.w - sw) * -.5;
+                    }else{
+                        let m = sw - game.w;
+                        if(game.x > 0) game.x = 0;
+                        if(game.x < m) game.x = m;
+                    }
+                    var sh = innerHeight/scale;
+                    if(sh >= game.h) {
+                        game.y = (game.h - sh) * -.5;
+                    }else{
+                        let m = sh - game.h;
+                        if(game.y > 0) game.y = 0;
+                        if(game.y < m) game.y = m;
+                        
+                    }
                 }
             }
         },
@@ -544,7 +573,9 @@ var DEAD = 10;
         h: 9,
         l: 0,
         steps: 10,
-        step: 0.1
+        get step() {return this._step * this.stepM},
+        _step: 0.1,
+        stepM: 1
     };
 
     function zoom(x, y, l=1, w=1, r, {h, k}={})
@@ -589,12 +620,6 @@ var DEAD = 10;
         var scaleX = game.width/game.w;
         var scaleY = game.height/game.h;
         scale = min(scaleX, scaleY) * game.zoomL;
-    };
-    onload = () =>
-    {
-        onresize();
-        document.body.appendChild(canvas);
-        start();
     };
     var mouse = {x: 0, y: 0, d: 0, s: 0};
     oncontextmenu = (e) => (mouse.d = 2, onmousemove(e), e.preventDefault());
@@ -753,7 +778,7 @@ var TIME = 0;
         }
         return tiles;
     }
-    var start = async function start()
+    var init = async function start()
     {
         try{
         var tiles = await mazeAi();
@@ -787,10 +812,16 @@ var TIME = 0;
     {
         try{
         if(mainMenu.active) mainMenu();
-        else{
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0, 0, innerWidth, innerHeight);
+        else if(worldSelect.active) worldSelect();
+        else world();
+        nextFrame();
+        }catch(err) {console.error(err)}
+    }
+    var world = function world() {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
 
+        if(!worldSelect.active) {
             if(creator) {
                 if(mouse.d)
                 {
@@ -842,6 +873,9 @@ var TIME = 0;
             if(keys.use("Enter")) {
                 console.log(Hex(mapTiles.join("")));
             }
+            if(keys.use("Backspace")) {
+                worldSelect.active = true;
+            }
             if(keys.use("Space")) {
                 if(player.remove) {
                     --level;
@@ -849,40 +883,30 @@ var TIME = 0;
                     player.remove = false;
                     player.dead = 0;
                     player.hp = 1;
+                    loader.enemies = [];
+                    loader.tiles = [];
+                    loader.load();
                     enemies = [player];
                 }
             }
+        }
 
-            game.update();
-            game.camera();
+        game.update();
+        game.camera();
 
-            ctx.strokeStyle = "grey";
-            ctx.lineWidth = 0.01;
+        ctx.strokeStyle = "grey";
+        ctx.lineWidth = 0.01;
+        {
+            let gx = game._x;
+            if(loader.dir) {
+                game._x -= game.w * 2 * loader.dir * (1 - (loader.delay)/loader.time);
+                alpha = 1;
+            }
             game.scale();
-            {
-                let w = game.w;
-                let h = game.h;
-                let x = w * .5;
-                let y = h * .5;
-                let r = max(w,h);
-                // let col = ctx.createLinearGradient(0, h, w, 0);
-                let col = ctx.createRadialGradient(x, y, 1, x, y, r);
-                col.addColorStop(0, "#3c3c3c");
-                col.addColorStop(.5, "#393939");
-                col.addColorStop(1, "#303030");
-                ctx.fillStyle = col;
-            }
+            ctx.fillStyle = game.color2(game.w, game.h);
             ctx.fillRect(0, 0, game.w, game.h);
-            {
-                let w = game.w;
-                let h = game.h;
-                let col = ctx.createLinearGradient(0, 0, w, h);
-                col.addColorStop(0, "#bbb");
-                col.addColorStop(.5, "#fff");
-                col.addColorStop(1, "#aaa");
-                ctx.fillStyle = col;
-            }
-            function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
+            ctx.fillStyle = game.color(game.w, game.h);
+            var drawTile = function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
                 function edge(x, y) {
                     if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
                         return !((x < -1 || x > game.w) || (y < -1 || y > game.h))
@@ -938,8 +962,8 @@ var TIME = 0;
                 }
                 ctx.closePath();
                 ctx.fill();
-            }
-            function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
+            };
+            var drawSpace = function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
                 function edge(x, y) {
                     return (x == -1 || x == game.w) || (y == -1 || y == game.h);
                 }
@@ -1001,7 +1025,7 @@ var TIME = 0;
                     ctx.closePath();
                     ctx.fill();
                 }
-            }
+            };
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
                 let i = Index(x, y);
@@ -1011,94 +1035,105 @@ var TIME = 0;
                     drawSpace(x, y);
                 }
             }
-            ctx.resetTransform();
-
-            if(loader.delay) {
-                var alpha = (1 - (loader.delay)/100) * .5;
-                let octx = loader.ctx;
-                loader.canvas.width = innerWidth;
-                // let color = `rgb(120, 120, 120, ${alpha})`;
-                // ctx.fillStyle = color;
-                game.scale();
-                game.scale(octx);
-                octx.fillStyle = ctx.fillStyle;
-                for(let x = 0; x < game.w; x++) for(let y = 0; y < game.h; y++)
-                {
-                    let i = Index(x, y);
-                    if(loader.tiles[i]) drawTile(x, y, loader.tiles, octx);
-                    else drawSpace(x, y, loader.tiles, octx);
-                }
-                for(let blob of loader.enemies) {
-                    blob.step(loader.tiles);
-                    blob.update(1 - (loader.delay)/100, loader.tiles);
-                    blob.draw(octx);
-                }
-                ctx.resetTransform();
-                octx.resetTransform();
-                --loader.delay;
-                if(loader.delay == 50) {
-                    mapTiles = [];
-                }
-                if(loader.delay == 0) {
-                    loader.load();
-                }
-                ctx.globalAlpha = alpha;
-                ctx.drawImage(loader.canvas, 0, 0);
-                ctx.globalAlpha = 1;
-            }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
-                startLevel();
-            }
-
-            ctx.resetTransform();
-
-            for(let blob of enemies) {
-                blob.step();
-            }
-            for(let a = 0; a < game.steps; a++) {
-                for(let i = 0, e = enemies.length; i < e; i++)
-                {
-                    let blob = enemies[i];
-                    blob.update(blob.stepf);
-                    for(let j = 0; j < i; j++)
-                    {
-                        let them = enemies[j];
-                        blob.register(them);
-                        them.register(blob);
-                        if(Entity.isTouching(blob, them))
-                        {
-                            if(blob instanceof Test && them instanceof Test) {
-                                blob.remove = true;
-                                them.remove = true;
-                            }
-                            if(Entity.hitTest(blob, them)) {
-                                blob.hit(them);
-                                them.hit(blob);
-                            }
-                            if(Entity.collTest(blob, them)) {
-                                Entity.collide(blob, them);
-                                blob.lcoll.set(them, 7);
-                                them.lcoll.set(blob, 7);
-                            }
-                        }
-                    }
-                    if(blob.undo && blob.stepf <= game.step * 7) {
-                        blob.stepf += game.step;
-                        blob.x = blob.sx;
-                        blob.y = blob.sy;
-                    }else blob.stepf = game.step;
-                    blob.undo = false;
-                }
-            }
-            for(let blob of enemies) {
+            if(worldSelect.active) for(let blob of enemies) {
                 blob.draw();
             }
-            enemies = enemies.filter(blob => !blob.remove);
-            // ctx.strokeStyle = "red";
-            // ctx.lineWidth = 1;
-            // ctx.strokeRect(0, 0, innerWidth/2, innerHeight/2);
+            game._x = gx;
         }
-        nextFrame();
-        }catch(err) {console.error(err)}
+        ctx.resetTransform();
+
+
+        if(loader.delay) {
+            var alpha = (1 - (loader.delay)/loader.time) * .5;
+            let octx = loader.ctx;
+            loader.canvas.width = innerWidth;
+            // let color = `rgb(120, 120, 120, ${alpha})`;
+            // ctx.fillStyle = color;
+            let gx = game._x;
+            if(loader.dir) {
+                game._x += game.w * 2 * loader.dir * (loader.delay)/loader.time;
+                alpha = 1;
+            }
+            game.scale();
+            game.scale(octx);
+            octx.fillStyle = loader.color2(game.w, game.h);
+            octx.fillRect(0, 0, game.w, game.h);
+            octx.fillStyle = loader.color(game.w, game.h);
+            for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
+            {
+                let i = Index(x, y);
+                if(loader.tiles[i] || outOfBounds(x, y)) drawTile(x, y, loader.tiles, octx);
+                else drawSpace(x, y, loader.tiles, octx);
+            }
+            for(let blob of loader.enemies) {
+                blob.step(loader.tiles);
+                blob.update(1 - (loader.delay)/100, loader.tiles);
+                blob.draw(octx);
+            }
+            game._x = gx;
+            ctx.resetTransform();
+            octx.resetTransform();
+            --loader.delay;
+            if(loader.delay == 50) {
+                mapTiles = [];
+            }
+            if(loader.delay == 0) {
+                loader.load();
+            }
+            ctx.globalAlpha = alpha;
+            ctx.drawImage(loader.canvas, 0, 0);
+            ctx.globalAlpha = 1;
+        }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
+            startLevel();
+        }
+
+        ctx.resetTransform();
+
+        for(let blob of enemies) {
+            blob.step();
+        }
+        for(let a = 0; a < game.steps; a++) {
+            for(let i = 0, e = enemies.length; i < e; i++)
+            {
+                let blob = enemies[i];
+                blob.update(blob.stepf);
+                for(let j = 0; j < i; j++)
+                {
+                    let them = enemies[j];
+                    blob.register(them);
+                    them.register(blob);
+                    if(Entity.isTouching(blob, them))
+                    {
+                        if(blob instanceof Test && them instanceof Test) {
+                            blob.remove = true;
+                            them.remove = true;
+                        }
+                        if(Entity.hitTest(blob, them)) {
+                            blob.hit(them);
+                            them.hit(blob);
+                        }
+                        if(Entity.collTest(blob, them)) {
+                            Entity.collide(blob, them);
+                            blob.lcoll.set(them, 7);
+                            them.lcoll.set(blob, 7);
+                        }
+                    }
+                }
+                if(blob.undo && blob.stepf <= game.step * 7) {
+                    blob.stepf += game.step;
+                    blob.x = blob.sx;
+                    blob.y = blob.sy;
+                }else blob.stepf = game.step;
+                blob.undo = false;
+            }
+        }
+        if(!worldSelect.active) for(let blob of enemies) {
+            blob.draw();
+        }
+        enemies = enemies.filter(blob => !blob.remove);
+        // ctx.strokeStyle = "red";
+        // ctx.lineWidth = 1;
+        // ctx.strokeRect(0, 0, innerWidth/2, innerHeight/2);
     }
 }
 //shapes.js
@@ -1450,7 +1485,6 @@ function Binary(hex) {
                 var s = this.s;
                 var box = {x: 0, y: 0, vx: this.vx, vy: this.vy, w: 1, h: 1};
                 {
-
                     box.hitWall = (x, y) => {
                         var sx = floor(Bx);
                         var sy = floor(By);
@@ -1518,7 +1552,7 @@ function Binary(hex) {
             if(this.hp != this.xhp) {
                 ctx.beginPath();
                 ctx.moveTo(.5, .5);
-                ctx.arc(.5, .5, 10, 0, PI2 * this.hp/this.xhp);
+                ctx.arc(.5, .5, 3, 0, PI2 * this.hp/this.xhp);
                 ctx.closePath();
                 ctx.clip();
             }
@@ -1755,7 +1789,7 @@ var TEAM = {
                 var blob = new Bullet(this, rad);
                 blob.nocoll = TEAM.GOOD;
                 enemies.push(blob);
-                this.lastSkill = 20;
+                this.lastSkill = 15;
             }
         }
     }
@@ -2424,10 +2458,18 @@ var TEAM = {
 }
 {//levels.js
     var startLevel = function startLevel() {
-        var obj = levels[level];
+        var world = worlds[selectedWorld];
+        var obj = world?.levels[level];
         if(!obj) return;
         ++level;
+        loadLevel(obj, world);
+    }
+    function loadLevel(obj, world) {
         loader.delay = 100;
+        loader.time = 100;
+        loader.color = world.color;
+        loader.color2 = world.color2;
+        loader.dir = 0;
         var {spawn=[], tiles="", seed} = obj;
         if(seed) lehmer.seed = seed;
         var layout = Binary(tiles);
@@ -2446,24 +2488,200 @@ var TEAM = {
                 num = 1;
             }
             for(let a = 0; a < num; a++) {
-                var blob = new cla().spawn(loader.tiles);
+                var blob = new cla();
+                if(worldSelect.active) {
+                    blob.nospawn = (tiles=mapTiles) => {
+                        for(let them of loader.enemies) {
+                            if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
+                                return true;
+                            }
+                        }
+                        return blob.inWall(0, tiles);
+                    }
+                }
+                blob.spawn(loader.tiles);
                 loader.enemies.push(blob);
             }
         }
     }
-    var levels = [{
-        spawn: [10, Chill],
-    }, {
-        spawn: [10, Mover],
-        tiles: "0000000060c00000380000060c00000000"
-    }, {
-        tiles: "0000202040408080380202040408080000",
-        spawn: [10, Wall]
-    }, {
-        tiles: "01000201c47008000000201c4700800100",
-        spawn: [5, Wall, 5, Mover]
-    }, {
-        tiles: "0000202040400000100000040408080000",
-        spawn: [Boss]
-    }]
+    var tutorial = {
+        world: {
+            tiles: "01000201c47008000000201c4700800100",
+            spawn: [5, Wall, 5, Mover]
+        },
+        levels: [{
+            spawn: [10, Chill],
+        }, {
+            spawn: [10, Mover],
+            tiles: "0000000060c00000380000060c00000000"
+        }, {
+            tiles: "0000202040408080380202040408080000",
+            spawn: [10, Wall]
+        }, {
+            tiles: "01000201c47008000000201c4700800100",
+            spawn: [5, Wall, 5, Mover]
+        }, {
+            tiles: "0000202040400000100000040408080000",
+            spawn: [Boss],
+            name: "Captain Motion"
+        }],
+        name: "Tutorial",
+        color2: (w, h) => {
+            let x = w * .5;
+            let y = h * .5;
+            let r = max(w,h);
+            // let col = ctx.createLinearGradient(0, h, w, 0);
+            let col = ctx.createRadialGradient(x, y, 1, x, y, r);
+            col.addColorStop(0, "#3c3c3c");
+            col.addColorStop(.5, "#393939");
+            col.addColorStop(1, "#303030");
+            return col;
+        },
+        color: (w, h) => {
+            let col = ctx.createLinearGradient(0, 0, w, h);
+            col.addColorStop(0, "#bbb");
+            col.addColorStop(.5, "#fff");
+            col.addColorStop(1, "#aaa");
+            return col;
+        }
+    };
+    var test = {
+        world: {
+            spawn: [5, Chill]
+        },
+        name: "Test",
+        color2: () => "#500",
+        color: () => "#f00"
+    }
+    let worlds = [tutorial];
+    let selectedWorld = 0;
+    let loadedWorld = -1;
+    let selectedLevel = 0;
+    let loadedLevel = -1;
+    let dir;
+    let mnu = 0;
+    var worldSelect = function worldSelect() {
+        if(mnu == 1) {
+            var lworld = loadedLevel;
+            var sworld = selectedLevel;
+            var wrlds = worlds[selectedWorld].levels;
+            var sWorld = worlds[selectedWorld];
+        }else{
+            wrlds = worlds;
+            sworld = selectedWorld;
+            lworld = loadedWorld;
+        }
+        if(lworld != sworld) {
+            loader.enemies = [];
+            let wrld = wrlds[sworld];
+            if(mnu) loadLevel(wrld, sWorld);
+            else loadLevel(wrld.world, wrld);
+            if(lworld == -1) {
+                game.color = wrld.color;
+                game.color2 = wrld.color2;
+                loader.load();
+            }else{
+                loader.dir = dir;
+                loader.time = 15;
+                loader.delay = 15;
+            }
+            if(mnu) loadedLevel = sworld;
+            else loadedWorld = sworld;
+        }
+        var wrld = sWorld || wrlds[sworld];
+        game.stepM = 0.5;
+        world();
+        ctx.resetTransform();
+        
+        var h = game.height/10;
+        ctx.font = `${h/2}px Josefin Sans`;
+        var label = wrld.name;
+        var c1 = wrld.color(game.width, game.height);
+        var c2 = wrld.color2(game.width, game.height);
+        var wid = ctx.measureText(label).width;
+        {
+            let w = wid * 1.5;
+            let w2 = w * 1.2;
+            ctx.beginPath();
+            let x1 = (game.width-w2)*.5;
+            let x2 = (game.width-w)*.5;
+            let y = h * 1.6;
+            ctx.lineWidth = h/10;
+            ctx.moveTo(x1, 0);
+            ctx.lineTo(x2, y);
+            ctx.lineTo(x2+w, y);
+            ctx.lineTo(x1+w2, 0);
+            ctx.closePath();
+            ctx.strokeStyle = c1;
+            ctx.fillStyle = c2;
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.fillStyle = c1;
+        ctx.fillText(label, (game.width-wid)*.5, h * 1);
+        if(mnu) {
+            var label = wrlds[sworld].name || "Level "+(sworld+1);
+            var c1 = wrld.color(game.width, game.height);
+            var c2 = wrld.color2(game.width, game.height);
+            var wid = ctx.measureText(label).width;
+            {
+                let w = wid * 1.5;
+                let w2 = w * 1.2;
+                ctx.beginPath();
+                let x1 = (game.width-w2)*.5;
+                let x2 = (game.width-w)*.5;
+                let b = game.height;
+                let y = b - h * 1.6;
+                ctx.lineWidth = h/10;
+                ctx.moveTo(x1, b);
+                ctx.lineTo(x2, y);
+                ctx.lineTo(x2+w, y);
+                ctx.lineTo(x1+w2, b);
+                ctx.closePath();
+                ctx.strokeStyle = c1;
+                ctx.fillStyle = c2;
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.fillStyle = c1;
+            ctx.fillText(label, (game.width-wid)*.5, h * 9.4);
+        }
+
+        if(keys.use("ArrowRight")) {
+            if(mnu) selectedLevel = loop(sworld+1, wrlds.length);
+            else selectedWorld = loop(sworld + 1, wrlds.length);
+            dir = 1;
+            if(loader.delay) loader.load();
+        }
+        if(keys.use("ArrowLeft")) {
+            if(mnu) selectedLevel = loop(sworld-1, wrlds.length);
+            else selectedWorld = loop(sworld + 1, wrlds.length);
+            dir = -1;
+            if(loader.delay) loader.load();
+        }
+        if(keys.use("Space")) {
+            if(mnu == 0) {
+                mnu = 1;
+                loadedWorld = -1;
+                if(loader.delay) loader.load();
+            }else{
+                mnu = 0;
+                loadedWorld = -1;
+                loadedLevel = -1;
+                loader.load();
+                worldSelect.active = false;
+                player = new Gunner().spawn();
+                enemies = [player];
+                level = selectedLevel;
+                game.stepM = 1;
+            }
+        }
+    };
+    worldSelect.active = true;
+};
+onload = () =>
+{
+    onresize();
+    document.body.appendChild(canvas);
+    init();
 };

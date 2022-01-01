@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.5";
+const gameVersion = "0.0.6";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -1748,7 +1748,7 @@ function Binary(hex) {
         x = 0; y = 0;
         vx = 0; vy = 0;
         s = 0.4; f = 0.8;
-        spd = 0.035;
+        spd = 0.032;
         x = 0; y = 0;
         stepf = 0;
         m = 1; b = 1;
@@ -2466,7 +2466,7 @@ var TEAM = {
         f = 0.7;
         constructor(r) {
             super(r);
-            this.spd *= 1.2;
+            this.spd *= 1.4;
         }
         time = 0;
         phase = 2;
@@ -2509,7 +2509,7 @@ var TEAM = {
                 }break;
                 case 1:
                     ++this.time;
-                    if(this.time >= 35) {
+                    if(this.time >= 40) {
                         for(let i = 0; i < 4; i++) {
                             let r = PI*.5*i;
                             var blob = new Mover();

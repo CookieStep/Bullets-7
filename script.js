@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.8";
+const gameVersion = "0.0.9";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -1131,11 +1131,13 @@ var TIME = 0;
                             blob.remove = true;
                             them.remove = true;
                         }
-                        if(Entity.hitTest(blob, them)) {
+                        var hit = Entity.hitTest(blob, them);
+                        var coll = Entity.collTest(blob, them);
+                        if(hit) {
                             blob.hit(them);
                             them.hit(blob);
                         }
-                        if(Entity.collTest(blob, them)) {
+                        if(coll) {
                             Entity.collide(blob, them);
                             blob.lcoll.set(them, 7);
                             them.lcoll.set(blob, 7);
@@ -1783,6 +1785,8 @@ function Binary(hex) {
             if(this.hp <= 0) {
                 this.dead = 1;
                 this.m /= 10;
+                this.team = 0;
+                this.coll = 0;
             }
         }
         boxes = [this];
@@ -1897,7 +1901,7 @@ var TEAM = {
             super.stats();
             if(this.lastShot) --this.lastShot;
 
-            if(this.lastSkill > 40) {
+            if(this.lastSkill > 30) {
                 this.color2 = "#f55";
                 this.r = this.lastSkill * .5;
                 this.team = 0;
@@ -1909,27 +1913,30 @@ var TEAM = {
                 this.color2 = "#f55";
                 this.team = TEAM.GOOD;
                 this.hits = TEAM.BAD;
-                this.coll = TEAM.ALLY & TEAM.ENEMY;
+                this.coll = TEAM.ALLY | TEAM.ENEMY;
             }else{
                 this.alpha = 1;
                 this.color2 = "#aaf";
                 this.team = TEAM.GOOD;
                 this.hits = TEAM.BAD;
-                this.coll = TEAM.ALLY & TEAM.ENEMY;
+                this.coll = TEAM.ALLY | TEAM.ENEMY;
             }
         }
         ability(key, mrad, srad) {
             if(!this.lastSkill) {
                 if(!isNaN(mrad)) {
-                    this.move(mrad, 15);
+                    this.move(mrad, 12);
                 }
-                this.lastSkill = 50;
+                this.lastSkill = 40;
             }
         }
         skill(rad) {
             if(!this.lastShot) {
                 this.move(rad + PI, 5);
                 var blob = new Bullet(this, rad);
+                blob.team = TEAM.GOOD | TEAM.BULLET;
+                blob.hits = TEAM.BAD;
+                blob.coll = TEAM.ALLY | TEAM.ENEMY;
                 blob.nocoll = TEAM.GOOD;
                 enemies.push(blob);
                 this.lastShot = 15;
@@ -1953,12 +1960,15 @@ var TEAM = {
         color = "#666";
         color2 = "#ff5";
         tick() {
-            if(this.lastShot) --this.lastShot;
+            if(this.lastShot) {
+                this.color2 = "#770";
+                --this.lastShot;
+            }else this.color2 = "#ff5";
             var {target} = this;
             if(!target) return;
             var rad = Entity.radian(this, target);
             var d = rDis(this.r, rad);
-            var m = 0.2;
+            var m = 0.1;
             if(abs(d) < m) this.r = rad;
             else this.r += m * sign(d);
 
@@ -1970,14 +1980,15 @@ var TEAM = {
         skill(rad) {
             if(!this.lastShot) {
                 // this.move(rad + PI, 5);
-                var blob = new Bullet(this, rad);
+                var blob = new Ball(this, rad);
                 blob.nocoll = TEAM.BAD;
+                blob.spd *= 0.7;
                 // blob.lcoll.set(this, 200);
-                blob.spd = this.spd;
-                blob.f = this.f;
-                blob.draw = super.draw;
-                blob.time = 100;
-                blob.shape = this.shape;
+                // blob.spd = this.spd;
+                // blob.f = this.f;
+                // blob.draw = super.draw;
+                // blob.time = 100;
+                // blob.shape = this.shape;
                 enemies.push(blob);
                 this.lastShot = 30;
             }
@@ -2224,6 +2235,41 @@ var TEAM = {
         s = 0.2;
         m = 0.1;
     };
+    var Ball = class Ball extends Mover{
+        constructor(parent, r) {
+            super(r);
+            this.parent = parent;
+            this.color = parent.color;
+            this.team = parent.team | TEAM.BULLET;
+            this.hits = parent.hits;
+            this.coll = parent.coll;
+            Ball.position(this, r, parent);
+        }
+        draw(ctx) {
+            var r = atan(this.vy, this.vx)
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
+        }
+        onHit(atk, who) {
+            this.remove = true;
+        }
+        hitWall(x, y) {
+            this.time -= 20;
+            super.hitWall(x, y);
+        }
+        tick() {
+            super.tick();
+            if(this.time > 0) --this.time;
+            else this.remove = true;
+        }
+        static position(what, r, parent) {
+            Bullet.position(what, r, parent);
+            what.lcoll.set(parent, 200);
+        }
+        time = 60;
+        s = 0.2;
+        m = 0.1;
+    }
     var Wall = class Wall extends Mover{
         tick(tiles=mapTiles) {
             var s = this.s * .5;
@@ -2714,6 +2760,11 @@ var TEAM = {
                 break;
             }
         }
+    };
+    var TurretBoss = class extends Chaser{
+        tick() {
+
+        }
     }
 }
 {//levels.js
@@ -2877,7 +2928,12 @@ var TEAM = {
             }, {
                 tiles: "01000001fbf0140fabe0501fbf00000100",
                 spawn: [10, Turret, 10, Chaser]
-            }],
+            }//, {
+            //     tiles: "010002002480410c826104024800800100",
+            //     spawn: [TurretBoss],
+            //     label: "Turret"
+            // }
+            ],
             color2: (w, h, z) => {
                 let col = ctx.createPattern(canv, "repeat");
                 col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));
@@ -2891,7 +2947,7 @@ var TEAM = {
         }
     }
     let worlds = [tutorial, test];
-    let selectedWorld = 0;
+    let selectedWorld = 1;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;

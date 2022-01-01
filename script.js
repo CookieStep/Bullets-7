@@ -1628,6 +1628,11 @@ function Binary(hex) {
             var s = (a.s - b.s)/2;
             return dist(a.y - b.y + s, a.x - b.x + s);
         }
+        static rawDistance = (a, b) =>
+        {
+            var s = (a.s - b.s)/2;
+            return (a.y - b.y + s) ** 2 + (a.x - b.x + s) ** 2;
+        }
         static hitbox(a, b)
         {
             var ar = a.x + a.s;
@@ -1965,9 +1970,10 @@ var TEAM = {
         m = 10;
         register(enemy) {
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
-            var dis = Entity.distance(this, enemy);
-            var d = 7;
-            var a = dis < d && (dis < this.clo || !this.clo);
+            var dis = Entity.rawDistance(this, enemy);
+            var d = 7 * 7;
+            var clo = this.clo * this.clo;
+            var a = dis < d && (!this.clo || dis < clo);
             if(!a) return;
             if(!this.sightCheck(enemy)) return;
             var {x, y, s} = enemy;
@@ -2501,9 +2507,11 @@ var TEAM = {
             this.brainMove();
         }
         register(enemy) {
-            var dis = Entity.distance(this, enemy);
-            var d = 10;
+            var dis = Entity.rawDistance(this, enemy);
+            var d = 10 * 10;
             if(dis < d) {
+                d = 10;
+                dis = dis ** .5;
                 var n = (dis - d)/-d;
                 var rad = Entity.radian(this, enemy);
                 n **= 2;
@@ -2553,15 +2561,16 @@ var TEAM = {
             if(enemy) {
                 if(!enemy.c) {
                     var dis = Entity.distance(this, enemy);
-                    this.clo = dis;
+                    this.clo = dis*dis;
                     var d = 15;
-                    if(dis < d) {
+                    if(dis < d*d) {
+                        dis = dis**.5;
                         var n = (dis - d)/-d;
                         var rad = Entity.radian(this, enemy);
                         n **= .5;
                         this.brainPoints.push([rad, n]);
                     }
-                    if(dis < .15) {
+                    if(dis < this.s*1.5) {
                         enemy.c = 1;
                     }
                     this.wander = .1;
@@ -2569,7 +2578,7 @@ var TEAM = {
                     this.wander = 1;
                 }
                 if(enemy.time > 49) {
-                    this.clo = 15;
+                    this.clo = 15*15;
                 }
                 --enemy.time;
                 if(!enemy.time || dis > d)
@@ -2586,11 +2595,12 @@ var TEAM = {
         }
         register(enemy) {
             if((this.team & enemy.team) && !(enemy.team & TEAM.BULLET)) {
-                var dis = Entity.distance(this, enemy);
+                var dis = Entity.rawDistance(this, enemy);
                 var d = (enemy.s + this.s)*1.5;
-                var a = dis < d;
+                var a = dis < d*d;
                 if(!a) return;
                 // if(!this.sightCheck(enemy)) return;
+                dis = dis**.5;
                 if(dis < d) {
                     var n = (dis - d)/-d;
                     var rad = Entity.radian(this, enemy);
@@ -2599,9 +2609,9 @@ var TEAM = {
                 }
             }
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
-            var dis = Entity.distance(this, enemy);
+            var dis = Entity.rawDistance(this, enemy);
             var d = 10;
-            var a = dis < d && (dis < this.clo || !this.clo);
+            var a = dis < d*d && (dis < this.clo || !this.clo);
             if(!a) return;
             if(!this.sightCheck(enemy)) return;
             var {x, y, s} = enemy;

@@ -460,10 +460,10 @@ var DEAD = 10;
 
                 var zoomX = game.w/(maxX - minX);
                 var zoomY = game.h/(maxY - minY);
-                let zoomLevel = min(zoomX, zoomY);
-                if(zoomLevel < 0.5) zoomLevel = 0.5;
-                if(zoomLevel > 2) zoomLevel = 2;
-                this.zoomO = zoomLevel;
+                let zoomL = min(zoomX, zoomY);
+                if(zoomL < 0.5) zoomL = 0.5;
+                if(zoomL > 2) zoomL = 2;
+                this.zoomO = zoomL;
                 var px = (minX + maxX)*.5;
                 var py = (minY + maxY)*.5;
 
@@ -525,10 +525,10 @@ var DEAD = 10;
                     }
                     var zoomX = game.w/(maxX - minX);
                     var zoomY = game.h/(maxY - minY);
-                    let zoomLevel = min(zoomX, zoomY);
-                    if(zoomLevel < 0.5) zoomLevel = 0.5;
-                    if(zoomLevel > 2) zoomLevel = 2;
-                    this.zoomO = zoomLevel;
+                    let zoomL = min(zoomX, zoomY);
+                    if(zoomL < 0.5) zoomL = 0.5;
+                    if(zoomL > 2) zoomL = 2;
+                    this.zoomO = zoomL;
                     var px = (minX + maxX)*.5;
                     var py = (minY + maxY)*.5;
 
@@ -1029,10 +1029,16 @@ var TIME = 0;
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
                 let i = Index(x, y);
-                if(mapTiles[i] || outOfBounds(x, y)) {
-                    drawTile(x, y);
+                if(loader.delay) {
+                    if(mapTiles[i] || outOfBounds(x, y)) {
+                        ctx.fillRect(x, y, 1, 1);
+                    }
                 }else{
-                    drawSpace(x, y);
+                    if(mapTiles[i] || outOfBounds(x, y)) {
+                        drawTile(x, y);
+                    }else{
+                        drawSpace(x, y);
+                    }
                 }
             }
             if(worldSelect.active) for(let blob of enemies) {
@@ -1046,7 +1052,11 @@ var TIME = 0;
         if(loader.delay) {
             var alpha = (1 - (loader.delay)/loader.time) * .5;
             let octx = loader.ctx;
-            loader.canvas.width = innerWidth;
+            // octx.globalCompositeOperation = "destination-out";
+            // octx.fillStyle = "black";
+            octx.clearRect(0, 0, game.width, game.height);
+            // octx.globalCompositeOperation = "source-over";
+            // loader.canvas.width = innerWidth;
             // let color = `rgb(120, 120, 120, ${alpha})`;
             // ctx.fillStyle = color;
             let gx = game._x;
@@ -1062,8 +1072,9 @@ var TIME = 0;
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
                 let i = Index(x, y);
-                if(loader.tiles[i] || outOfBounds(x, y)) drawTile(x, y, loader.tiles, octx);
-                else drawSpace(x, y, loader.tiles, octx);
+                if(loader.tiles[i] || outOfBounds(x, y)) octx.fillRect(x-.01, y-.01, 1.02, 1.02);
+                // if(loader.tiles[i] || outOfBounds(x, y)) drawTile(x, y, loader.tiles, octx);
+                // else drawSpace(x, y, loader.tiles, octx);
             }
             for(let blob of loader.enemies) {
                 blob.step(loader.tiles);
@@ -1190,6 +1201,19 @@ var TIME = 0;
         ctx.quadraticCurveTo(0, 1, 0, 1 - r);
         ctx.lineTo(0, r);
         ctx.quadraticCurveTo(0, 0, r, 0);
+    });
+    shape("arrow.2", path => {
+		//Top Triangle
+		path.moveTo(1 / 2, 1 / 8);
+		path.lineTo(3 / 4, 2 / 5);
+		path.lineTo(1 / 4, 2 / 5);
+		path.closePath();
+		//Bottom Triangle
+		path.moveTo(1 / 2, 4 / 8);
+		path.lineTo(3 / 4, 4 / 5);
+		path.lineTo(1 / 4, 4 / 5);
+		path.closePath();
+		path.rotation = PI / 2;
     });
 }
 function hex(byte) {
@@ -1539,27 +1563,43 @@ function Binary(hex) {
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
-        draw(ctx=game.ctx)
+        pen(ctx=game.ctx, {fill, stroke, scale=1, shape:shp=this.shape, r=0}, hp)
         {
             var {x, y, s, alpha=1} = this;
-            var r = atan(this.vy, this.vx);
-
-            ctx.lineWidth = 0.05;
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = this.color;
-            game.zoom(x, y, s, s, r, 0, 0, ctx);
-            ctx.save();
-            if(this.hp != this.xhp) {
-                ctx.beginPath();
-                ctx.moveTo(.5, .5);
-                ctx.arc(.5, .5, 3, 0, PI2 * this.hp/this.xhp);
-                ctx.closePath();
-                ctx.clip();
+            if(scale != 1) {
+                let mx = x+s*.5;
+                let my = y+s*.5;
+                s = s * scale;
+                x = mx - s *.5;
+                y = my - s *.5;
             }
-            ctx.fill(shape(this.shape));
-            ctx.restore();
-            ctx.strokeStyle = this.color;
-            ctx.stroke(shape(this.shape));
+            ctx.lineWidth = 0.1/scale;
+            ctx.globalAlpha = alpha;
+            game.zoom(x, y, s, s, r, 0, 0, ctx);
+            if(!isNaN(hp)) {
+                if(this.hp < this.xhp) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(.5, .5);
+                    ctx.arc(.5, .5, 3, -hp, -hp + PI2 * this.hp/this.xhp);
+                    ctx.closePath();
+                    ctx.clip();
+                }
+            }
+            if(fill) {
+                ctx.fillStyle = fill;
+                ctx.fill(shape(shp));
+            }
+            if(stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.stroke(shape(shp));
+            }
+            if(!isNaN(hp)) {
+                if(this.hp < this.xhp) {
+                    ctx.restore();
+                }
+            }
+
             ctx.globalAlpha = 1;
             ctx.strokeStyle = "red";
             // for(let {x, y, s} of this.boxes) {
@@ -1567,6 +1607,11 @@ function Binary(hex) {
             //     ctx.strokeRect(0, 0, 1, 1);
             // }
             ctx.resetTransform();
+        }
+        draw(ctx) {
+            var r = atan(this.vy, this.vx)
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
         }
         static distance = (a, b) =>
         {
@@ -1727,7 +1772,20 @@ var TEAM = {
     var Player = class Player extends Entity
     {
         color = "#55f";
+        color2 = "#aaf";
         shape = "square.3";
+        draw(ctx) {
+            var r = atan(this.vy, this.vx);
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
+            if(!this.dead && this.hp) {
+                if(this.lastSkill) {
+                    this.pen(ctx, {stroke: this.color2, scale: .5, r}, 0);
+                }else{
+                    this.pen(ctx, {fill: this.color2, stroke: this.color2, scale: .5, r}, 0);
+                }
+            }
+        }
         tick()
         {
             this.keys();
@@ -1736,9 +1794,6 @@ var TEAM = {
         skill(rad) {}
         stats() {
             if(this.lastSkill) --this.lastSkill;
-        }
-        draw() {
-            super.draw();
         }
         keys()
         {
@@ -1898,6 +1953,13 @@ var TEAM = {
         }
         color = "#ff5";
         shape = "square.4";
+        color2 = "#aa0";
+        shape2 = "arrow.2";
+        draw(ctx) {
+            var r = atan(this.vy, this.vx) + PI*.5;
+            super.draw(ctx);
+            this.pen(ctx, {shape: this.shape2, fill: this.color2, stroke: this.color2, r}, PI*.5);
+        }
     };
     var Stuck = class Stuck extends Enemy
     {
@@ -1990,7 +2052,7 @@ var TEAM = {
             ctx.stroke();
             ctx.resetTransform();
         }
-        time = 6;
+        time = 8;
         spd = 1;
         f = 0.01;
         static position(what, rad, parent) {
@@ -2098,29 +2160,32 @@ var TEAM = {
                     });
                     // console.log(rad, obj);
                     cho = weight(obj);
-                    if(options.size > 2) {
+                    // if(options.size > 2) {
                         this.last = cho;
                         this.lastT = 40;
-                    }
+                    // }
                     this.move(cho);
-                }else if(options.size == 1) {
-                    cho = randomOf(options);
-                    this.move(cho);
-                }else if(this.arr) {
-                    var {arr} = this;
-                    options.clear();
-                    if(arr[0]) options.add(P*3);
-                    if(arr[1]) options.add(P);
-                    if(arr[2]) options.add(PI);
-                    if(arr[3]) options.add(0);
-                    cho = randomOf(options);
-                    if(cho) {
-                        this.move(cho);
-                        this.last = cho;
-                        this.arr = arr;
-                    }else this.move(rad);
                 }else{
-                    this.move(rad);
+                    delete this.last;
+                    if(options.size == 1) {
+                        cho = randomOf(options);
+                        this.move(cho);
+                    }else if(this.arr) {
+                        var {arr} = this;
+                        options.clear();
+                        if(arr[0]) options.add(P*3);
+                        if(arr[1]) options.add(P);
+                        if(arr[2]) options.add(PI);
+                        if(arr[3]) options.add(0);
+                        cho = randomOf(options);
+                        if(cho) {
+                            this.move(cho);
+                            this.last = cho;
+                            this.arr = arr;
+                        }else this.move(rad);
+                    }else{
+                        this.move(rad);
+                    }
                 }
             }
             this.cho = cho;
@@ -2152,6 +2217,7 @@ var TEAM = {
             delete this.cho;
         }
         color = "#f5f";
+        color2 = "#b0b";
     }
     var Wall_Fix = class extends Enemy{
         team = 0;
@@ -2395,8 +2461,13 @@ var TEAM = {
         nocoll = TEAM.BAD;
         hp = 10;
         xhp = 10;
-        s = 1;
-        m = 0.1;
+        s = 0.8;
+        m = 0.2;
+        f = 0.7;
+        constructor(r) {
+            super(r);
+            this.spd *= 1.2;
+        }
         time = 0;
         phase = 2;
         isPlayer(what) {
@@ -2416,14 +2487,17 @@ var TEAM = {
                 ++this.phase;
                 this.time = 0;
                 this.color = "#f95";
+                this.color2 = "#a60";
             }
             else if(this.phase == 1) {
                 this.phase = 2;
                 this.color = "#ff5";
+                this.color2 = "#aa0";
             }
             else if(this.phase == 2) {
                 this.phase = 0;
                 this.color = "#d00";
+                this.color2 = "#800";
             }
         }
         tick() {
@@ -2435,11 +2509,12 @@ var TEAM = {
                 }break;
                 case 1:
                     ++this.time;
-                    if(this.time >= 50) {
+                    if(this.time >= 35) {
                         for(let i = 0; i < 4; i++) {
                             let r = PI*.5*i;
                             var blob = new Mover();
                             blob.color = this.color;
+                            blob.color2 = this.color2;
                             Bullet.position(blob, r, this);
                             blob.nocoll = TEAM.BAD;
                             enemies.push(blob);
@@ -2447,6 +2522,7 @@ var TEAM = {
                         ++this.phase;
                         this.time = 0;
                         this.color = "#ff5";
+                        this.color2 = "#aa0";
                     }
                 break;
                 case 2:
@@ -2465,8 +2541,8 @@ var TEAM = {
         loadLevel(obj, world);
     }
     function loadLevel(obj, world) {
-        loader.delay = 100;
-        loader.time = 100;
+        loader.delay = 51;
+        loader.time  = 51;
         loader.color = world.color;
         loader.color2 = world.color2;
         loader.dir = 0;

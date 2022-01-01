@@ -331,6 +331,13 @@ var DEAD = 10;
     var scale = 40;
     var sf = 1/20;
 
+    var zoomMatrix = function(x, y, w, h) {
+        return Object.assign(new DOMMatrix(), {
+            a: w, b: 0, c: 0,
+            d: h, e: x, f: y
+        });
+    };
+
     var {PI, cos, sin, tan, round, sign, sqrt, abs, atan2: atan, min, max, floor, ceil} = Math;
     var dist = (x, y) => sqrt(x * x + y * y);
     var loop = (value, max) => (value % max + max) % max;
@@ -903,9 +910,9 @@ var TIME = 0;
                 alpha = 1;
             }
             game.scale();
-            ctx.fillStyle = game.color2(game.w, game.h);
+            ctx.fillStyle = game.color2(game.w, game.h, scale/game.zoomL);
             ctx.fillRect(0, 0, game.w, game.h);
-            ctx.fillStyle = game.color(game.w, game.h);
+            ctx.fillStyle = game.color(game.w, game.h, scale/game.zoomL);
             var drawTile = function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
                 function edge(x, y) {
                     if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
@@ -1066,9 +1073,9 @@ var TIME = 0;
             }
             game.scale();
             game.scale(octx);
-            octx.fillStyle = loader.color2(game.w, game.h);
+            octx.fillStyle = loader.color2(game.w, game.h, scale/game.zoomL);
             octx.fillRect(0, 0, game.w, game.h);
-            octx.fillStyle = loader.color(game.w, game.h);
+            octx.fillStyle = loader.color(game.w, game.h, scale/game.zoomL);
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
                 let i = Index(x, y);
@@ -1774,18 +1781,6 @@ var TEAM = {
         color = "#55f";
         color2 = "#aaf";
         shape = "square.3";
-        draw(ctx) {
-            var r = atan(this.vy, this.vx);
-            this.pen(ctx, {fill: this.color, r}, 0);
-            this.pen(ctx, {stroke: this.color, r});
-            if(!this.dead && this.hp) {
-                if(this.lastSkill) {
-                    this.pen(ctx, {stroke: this.color2, scale: .5, r}, 0);
-                }else{
-                    this.pen(ctx, {fill: this.color2, stroke: this.color2, scale: .5, r}, 0);
-                }
-            }
-        }
         tick()
         {
             this.keys();
@@ -1806,8 +1801,8 @@ var TEAM = {
 
             if(x || y)
             {
-                var rad = atan(y, x);
-                this.move(rad, 1);
+                var mrad = atan(y, x);
+                this.move(mrad, 1);
             }
 
             x = 0; y = 0;
@@ -1818,8 +1813,8 @@ var TEAM = {
 
             if(x || y)
             {
-                rad = atan(y, x);
-                this.skill(rad);
+                var srad = atan(y, x);
+                this.skill(srad);
             }
 
             if(mouse.d) {
@@ -1829,22 +1824,79 @@ var TEAM = {
                 y = y/scale - game._y;
                 x -= this.x + s;
                 y -= this.y + s;
-                rad = atan(y, x);
-                this.skill(rad);
+                var srad = atan(y, x);
+                this.skill(srad);
+            }
+
+            if(keys.has("ShiftRight")) {
+                this.ability(keys.get("ShiftRight"), mrad, srad);
+                keys.set("ShiftRight", 2);
+            }else if(keys.has("ShiftLeft")) {
+                this.ability(keys.get("ShiftLeft"), mrad, srad);
+                keys.set("ShiftLeft", 2);
+            }else if(keys.has("Space")) {
+                this.ability(keys.get("Space"), mrad, srad);
+                keys.set("Space", 2);
             }
         }
+
         team = TEAM.GOOD | TEAM.ALLY;
         coll = TEAM.ALLY | TEAM.ENEMY;
         hits = TEAM.BAD;
     }
     var Gunner = class Gunner extends Player{
-        skill(rad) {
+        draw(ctx) {
+            var r = atan(this.vy, this.vx);
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
+            if(!this.dead && this.hp) {
+                if(this.lastShot) {
+                    this.pen(ctx, {stroke: this.color2, scale: .5, r}, 0);
+                }else{
+                    this.pen(ctx, {fill: this.color2, stroke: this.color2, scale: .5, r}, 0);
+                }
+            }
+        }
+        stats() {
+            super.stats();
+            if(this.lastShot) --this.lastShot;
+
+            if(this.lastSkill > 40) {
+                this.color2 = "#f55";
+                this.r = this.lastSkill * .5;
+                this.team = 0;
+                this.hits = 0;
+                this.coll = 0;
+                this.alpha = .2;
+            }else if(this.lastSkill) {
+                this.alpha = 1;
+                this.color2 = "#f55";
+                this.team = TEAM.GOOD;
+                this.hits = TEAM.BAD;
+                this.coll = TEAM.ALLY & TEAM.ENEMY;
+            }else{
+                this.alpha = 1;
+                this.color2 = "#aaf";
+                this.team = TEAM.GOOD;
+                this.hits = TEAM.BAD;
+                this.coll = TEAM.ALLY & TEAM.ENEMY;
+            }
+        }
+        ability(key, mrad, srad) {
             if(!this.lastSkill) {
+                if(!isNaN(mrad)) {
+                    this.move(mrad, 15);
+                }
+                this.lastSkill = 50;
+            }
+        }
+        skill(rad) {
+            if(!this.lastShot) {
                 this.move(rad + PI, 5);
                 var blob = new Bullet(this, rad);
                 blob.nocoll = TEAM.GOOD;
                 enemies.push(blob);
-                this.lastSkill = 15;
+                this.lastShot = 15;
             }
         }
     }
@@ -1858,6 +1910,63 @@ var TEAM = {
     };
     var Chill = class Chill extends Enemy{
         color = "#afa";
+    };
+    var Turret = class Turret extends Enemy{
+        shape = 'square.4';
+        color = "#666";
+        color2 = "#ff5";
+        tick() {
+            if(this.lastShot) --this.lastShot;
+            var {target} = this;
+            if(!target) return;
+            var rad = Entity.radian(this, target);
+            var d = rDis(this.r, rad);
+            var m = 0.1;
+            if(d < m) this.r = rad;
+            else this.r += m * sign(d);
+
+            this.skill(this.r);
+
+            delete this.target;
+            delete this.clo;
+        }
+        skill(rad) {
+            if(!this.lastShot) {
+                // this.move(rad + PI, 5);
+                var blob = new Bullet(this, rad);
+                blob.nocoll = TEAM.BAD;
+                // blob.lcoll.set(this, 200);
+                blob.spd = this.spd;
+                blob.f = this.f;
+                blob.draw = super.draw;
+                blob.time = 100;
+                blob.shape = this.shape;
+                enemies.push(blob);
+                this.lastShot = 30;
+            }
+        }
+        constructor() {
+            super();
+            this.r = random(PI2);
+        }
+        m = 10;
+        register(enemy) {
+            if(!this.sightCheck(enemy)) return;
+            if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
+            var dis = Entity.distance(this, enemy);
+            var d = 7;
+            if(dis < d && (dis < this.clo || !this.clo)) {
+                var {x, y, s} = enemy;
+                this.target = {x, y, s};
+                this.clo = dis;
+            }
+        }
+        draw(ctx) {
+            var r = this.r;
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
+            this.pen(ctx, {fill: this.color2, stroke: this.color2, r, scale: .5}, 0);
+        }
     }
     var Test = class Test extends Enemy
     {
@@ -2445,7 +2554,6 @@ var TEAM = {
         }
         register(enemy) {
             if(!this.sightCheck(enemy)) return;
-            if(enemy instanceof Chaser) return;
             // if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.distance(this, enemy);
             var d = 10;
@@ -2565,7 +2673,7 @@ var TEAM = {
             }
             for(let a = 0; a < num; a++) {
                 var blob = new cla();
-                if(worldSelect.active) {
+                // if(worldSelect.active) {
                     blob.nospawn = (tiles=mapTiles) => {
                         for(let them of loader.enemies) {
                             if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
@@ -2574,7 +2682,7 @@ var TEAM = {
                         }
                         return blob.inWall(0, tiles);
                     }
-                }
+                // }
                 blob.spawn(loader.tiles);
                 loader.enemies.push(blob);
             }
@@ -2601,7 +2709,7 @@ var TEAM = {
             spawn: [Boss],
             name: "Captain Motion"
         }],
-        name: "Tutorial",
+        name: "World 1",
         color2: (w, h) => {
             let x = w * .5;
             let y = h * .5;
@@ -2621,16 +2729,87 @@ var TEAM = {
             return col;
         }
     };
-    var test = {
-        world: {
-            spawn: [5, Chill]
-        },
-        name: "Test",
-        color2: () => "#500",
-        color: () => "#f00"
+    {
+        let canv = document.createElement("canvas");
+        let ctx1 = canv.getContext("2d");
+        let canv2 = document.createElement("canvas");
+        let ctx2 = canv2.getContext("2d");
+        canv.width = 100;
+        canv.height = 100;
+        canv2.width = 100;
+        canv2.height = 100;
+        let draw = () => {
+            var {width: w, height: h} = canv;
+            var ctx = ctx1;
+            ctx.fillStyle = "#111";
+            ctx.scale(w, h);
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = "#600";
+            ctx.fillRect(.1, .1, .1, .1);
+            ctx.fillRect(0, .5, .1, .1);
+            ctx.fillStyle = "#006";
+            ctx.fillRect(.6, .7, .1, .1);
+            ctx.fillRect(0, 0, .1, .1);
+            ctx.fillStyle = "#050";
+            ctx.fillRect(.2, .8, .1, .1);
+            ctx.fillRect(.6, .2, .1, .1);
+            ctx.fillStyle = "#660";
+            ctx.fillRect(.3, .5, .1, .1);
+            ctx.fillStyle = "#066";
+            ctx.fillRect(.6, .9, .1, .1);
+            ctx.fillRect(.8, .3, .1, .1);
+            ctx.fillStyle = "#505";
+            ctx.fillRect(.8, .8, .1, .1);
+
+            var ctx = ctx2;
+            ctx.fillStyle = "#999";
+            ctx.scale(w, h);
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = "#a00";
+            ctx.fillRect(.2, .2, .1, .1);
+            ctx.fillRect(.9, .4, .1, .1);
+            ctx.fillStyle = "#00a";
+            ctx.fillRect(.5, .9, .1, .1);
+            ctx.fillRect(.7, .2, .1, .1);
+            ctx.fillStyle = "#0a0";
+            ctx.fillRect(0, .7, .1, .1);
+            ctx.fillRect(.4, .1, .1, .1);
+            ctx.fillStyle = "#aa0";
+            ctx.fillRect(.3, .5, .1, .1);
+            ctx.fillStyle = "#0aa";
+            ctx.fillRect(.9, 0, .1, .1);
+            ctx.fillStyle = "#a0a";
+            ctx.fillRect(.7, .7, .1, .1);
+            ctx.fillRect(.6, .1, .1, .1);
+        };
+        draw();
+        var test = {
+            world: {
+                spawn: [5, Turret],
+                tiles: "01000201c47008000000201c4700800100",
+            },
+            name: "World 2",
+            levels: [{
+                spawn: [10, Turret],
+                tiles: "1110202000008089012202000008081110"
+            }, {
+                tiles: "00002521fbf080810102021fbf09480000",
+                spawn: [10, Turret]
+            }],
+            color2: (w, h, z) => {
+                let col = ctx.createPattern(canv, "repeat");
+                col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));
+                return col;
+            },
+            color: (w, h, z) => {
+                let col = ctx.createPattern(canv2, "repeat");
+                col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));
+                return col;
+            }
+        }
     }
-    let worlds = [tutorial];
-    let selectedWorld = 0;
+    let worlds = [tutorial, test];
+    let selectedWorld = 1;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;
@@ -2672,12 +2851,12 @@ var TEAM = {
         var h = game.height/10;
         ctx.font = `${h/2}px Josefin Sans`;
         var label = wrld.name;
-        var c1 = wrld.color(game.width, game.height);
-        var c2 = wrld.color2(game.width, game.height);
+        var c1 = wrld.color(game.width, game.height, game.zoomL);
+        var c2 = wrld.color2(game.width, game.height, game.zoomL);
         var wid = ctx.measureText(label).width;
         {
             let w = wid * 1.5;
-            let w2 = w * 1.2;
+            let w2 = wid * 1.8;
             ctx.beginPath();
             let x1 = (game.width-w2)*.5;
             let x2 = (game.width-w)*.5;
@@ -2697,8 +2876,6 @@ var TEAM = {
         ctx.fillText(label, (game.width-wid)*.5, h * 1);
         if(mnu) {
             var label = wrlds[sworld].name || "Level "+(sworld+1);
-            var c1 = wrld.color(game.width, game.height);
-            var c2 = wrld.color2(game.width, game.height);
             var wid = ctx.measureText(label).width;
             {
                 let w = wid * 1.5;

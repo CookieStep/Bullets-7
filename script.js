@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.9";
+const gameVersion = "0.0.10";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -1945,6 +1945,9 @@ var TEAM = {
     }
     var Enemy = class Enemy extends Entity
     {
+        isPlayer(what) {
+            return (what.team & TEAM.GOOD) && !(what.team & TEAM.BULLET);
+        }
         color = "red";
         team = TEAM.ENEMY | TEAM.BAD;
         coll = TEAM.ENEMY | TEAM.ALLY;
@@ -2551,10 +2554,11 @@ var TEAM = {
             var d = 3;
             var p = 5;
             var o = PI * .25;
+            var off = PI * .125;
 
             for(let i = 0; i < 8; i++) {
-                var c = cos(o * i) * d;
-                var s = sin(o * i) * d;
+                var c = cos(o * i + off) * d;
+                var s = sin(o * i + off) * d;
                 var dis = Test.lineCheck(mx, my, mx + c, my + s, tiles);
                 if(dis && dis < d) {
                     // ctx.scale(scale, scale);
@@ -2567,7 +2571,7 @@ var TEAM = {
                     // ctx.resetTransform();
                     var n = (dis - d)/-d;
                     n **= p;
-                    this.brainPoints.push([o * i, -n * .5]);
+                    this.brainPoints.push([o * i + off, -n * .5]);
                 }
             }
             this.brainMove();
@@ -2619,7 +2623,10 @@ var TEAM = {
         shape = 'square.4';
         color = "#666";
         color2 = "#fa5";
-        draw = Turret.prototype.draw;
+        dist = 10;
+        draw(ctx) {
+            Turret.prototype.draw.call(this, ctx);
+        }
         tick(tiles) {
             this.r = this.rad;
             var enemy = this.target;
@@ -2628,22 +2635,22 @@ var TEAM = {
                 if(!enemy.c) {
                     var dis = Entity.rawDistance(this, enemy);
                     this.clo = dis*dis;
-                    var d = 15;
+                    var d = this.dist+5;
                     if(dis < d*d) {
                         dis = dis**.5;
                         var n = (dis - d)/-d;
                         var rad = Entity.radian(this, enemy);
                         n **= .5;
-                        this.brainPoints.push([rad, n]);
-                    }
-                    if(dis < this.s*1.5) {
-                        enemy.c = 1;
+                        this.brainPoints.push([rad, n * 0.8]);
+                        if(dis < this.s*1.5) {
+                            enemy.c = 1;
+                        }
                     }
                     this.wander = .1;
                 }else{
                     this.wander = 1;
                 }
-                if(enemy.time > 49) {
+                if(enemy.time < 49) {
                     this.clo = 15*15;
                 }
                 --enemy.time;
@@ -2653,13 +2660,9 @@ var TEAM = {
                     delete this.clo;
                 }
             }
-            // if(this.target) {
-            //     if(this.target.time >= 99) this.color = "red";
-            //     else this.color = "yellow";
-            // }else this.color = "green";
             super.tick(tiles);
         }
-        register(enemy) {
+        register(enemy, sight=true) {
             if((this.team & enemy.team) && !(enemy.team & TEAM.BULLET)) {
                 var dis = Entity.rawDistance(this, enemy);
                 var d = (enemy.s + this.s)*1.5;
@@ -2676,10 +2679,10 @@ var TEAM = {
             }
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.rawDistance(this, enemy);
-            var d = 10;
+            var d = this.dist;
             var a = dis < d*d && (dis < this.clo || !this.clo);
             if(!a) return;
-            if(!this.sightCheck(enemy)) return;
+            if(sight && !this.sightCheck(enemy)) return;
             var {x, y, s} = enemy;
             this.target = {x, y, s, time: 50};
             this.clo = dis;
@@ -2700,11 +2703,8 @@ var TEAM = {
         }
         time = 0;
         phase = 2;
-        isPlayer(what) {
-            return (what.team & TEAM.GOOD) && !(what.team & TEAM.BULLET);
-        }
-        step() {
-            super.step();
+        step(m) {
+            super.step(m);
             delete this.target;
         }
         register(what) {
@@ -2762,8 +2762,81 @@ var TEAM = {
         }
     };
     var TurretBoss = class extends Chaser{
-        tick() {
+        hp = 10;
+        xhp = 10;
+        s = 0.8;
+        m = 0.2;
+        color = "#970";
+        color2 = "#aa0"
+        time = 0;
+        phase = 0;
+        dist = 20;
+        r = 0;
+        step(m) {
+            super.step(m);
+            delete this.player;
+        }
+        register(what) {
+            super.register(what);
+            if(this.isPlayer(what)) this.player = what;
+        }
+        draw(ctx) {
+            super.draw(ctx);
+            var {teleport} = this;
+            if(teleport) {
+                var {x, y, color} = this;
+                this.color = "red";
+                this.alpha = .5;
+                this.x = teleport.x;
+                this.y = teleport.y;
+                super.draw(ctx);
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                delete this.alpha;
+            }
+        }
+        tick(tiles) {
+            var {target, player, teleport} = this;
+            this.color2 = this.color;
+            switch(this.phase) {
+                case 0:if(player) {
+                    let {x, y} = player;
+                    let s = (player.s - this.s)*.5;
+                    x += s; y += s;
+                    this.teleport = {x, y};
+                    this.phase = 1;
+                    this.time = 0;
+                }break;
+                case 1:if(++this.time == 50) {
+                    this.x = teleport.x;
+                    this.y = teleport.y;
+                    this.wallInv = 1;
+                    delete this.teleport;
+                    // delete this.target;
+                    this.phase = 2;
+                    this.time = 0;
+                }break;
+                case 2:
+                    if(player && ++this.time <= 30 && this.time % 5 == 0) {
+                        let rad = Entity.radian(this, player);
+                        let blob = new Ball(this, rad);
+                        blob.time = 200;
+                        blob.move(rad, 25);
+                        blob.nocoll = TEAM.BAD;
+                        enemies.push(blob);
+                    }
+                    if(this.time > 100) {
+                        this.color2 = "red";
+                    }
+                    super.tick(tiles);
+                    if(this.time == 150) {
+                        if(this.sightCheck(player)) this.time = 0;
+                        else this.phase = 0;
+                    }
+                break;
 
+            }
         }
     }
 }
@@ -2928,11 +3001,11 @@ var TEAM = {
             }, {
                 tiles: "01000001fbf0140fabe0501fbf00000100",
                 spawn: [10, Turret, 10, Chaser]
-            }//, {
-            //     tiles: "010002002480410c826104024800800100",
-            //     spawn: [TurretBoss],
-            //     label: "Turret"
-            // }
+            }, {
+                tiles: "0000020004000007c7c000004000800000",
+                spawn: [TurretBoss],
+                label: "Ball Master"
+            }
             ],
             color2: (w, h, z) => {
                 let col = ctx.createPattern(canv, "repeat");

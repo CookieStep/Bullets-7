@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.10";
+const gameVersion = "0.0.11";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -825,9 +825,10 @@ var TIME = 0;
         }catch(err) {console.error(err)}
     }
     var world = function world() {
-        if(TIME % 100 == 0) {
-            onresize();
+        if(++TIME % 100 == 0) {
+            canvas.width = game.width;
         }
+        if(TIME >= 1000) TIME = 0;
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, innerWidth, innerHeight);
 
@@ -1720,7 +1721,6 @@ function Binary(hex) {
             // ctx.lineTo(ex, ey);
             // ctx.stroke();
 
-
             ex -= uy;
             ey += ux;
 
@@ -1771,7 +1771,7 @@ function Binary(hex) {
         }
         wallTick() {
             ++this.wallInv;
-            if(this.wallInv == 100) {
+            if(this.wallInv == 20) {
                 var save = new Wall_Fix(this);
                 save.spawn();
                 enemies.push(save);
@@ -1879,7 +1879,6 @@ var TEAM = {
                 keys.set("Space", 2);
             }
         }
-
         team = TEAM.GOOD | TEAM.ALLY;
         coll = TEAM.ALLY | TEAM.ENEMY;
         hits = TEAM.BAD;
@@ -1942,7 +1941,7 @@ var TEAM = {
                 this.lastShot = 15;
             }
         }
-    }
+    };
     var Enemy = class Enemy extends Entity
     {
         isPlayer(what) {
@@ -2257,7 +2256,7 @@ var TEAM = {
             this.remove = true;
         }
         hitWall(x, y) {
-            this.time -= 20;
+            this.time -= 10;
             super.hitWall(x, y);
         }
         tick() {
@@ -3005,8 +3004,7 @@ var TEAM = {
                 tiles: "0000020004000007c7c000004000800000",
                 spawn: [TurretBoss],
                 label: "Ball Master"
-            }
-            ],
+            }],
             color2: (w, h, z) => {
                 let col = ctx.createPattern(canv, "repeat");
                 col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));

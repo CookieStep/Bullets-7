@@ -1,9 +1,11 @@
 "use strict";
-const gameVersion = "0.0.11";
+const gameVersion = "0.0.12";
 const RUN_KEY = Symbol();
-
+//
 var bullets = [];
 var enemies = [];
+
+var Enviroment = window.Enviroment;
 
 var lockToEdges = false;
 var cameraState = "";
@@ -330,6 +332,17 @@ var DEAD = 10;
     var drawCreation = false;
     var scale = 40;
     var sf = 1/20;
+
+    var gone;
+    if(Enviroment == "Sololearn") gone = true;
+    onblur = () => {
+        gone = true;
+    };
+    onfocus = () => {
+        gone = false;
+        whenFocus();
+    };
+    var whenFocus = () => {};
 
     var zoomMatrix = function(x, y, w, h) {
         return Object.assign(new DOMMatrix(), {
@@ -812,12 +825,22 @@ var TIME = 0;
         }catch(err) {console.error(err)}
         main();
     }
-    var nextFrame = () => RUN_KEY == window.run_key && setTimeout(main, 1000/40);
+    var ms = 1000/40;
+    var nextFrame = () => {
+        setTimeout(() => {
+            if(gone) {
+                whenFocus = main;
+            }else{
+                main();
+            }
+        }, ms);
+    };
     var player;
     var lastI = -1;
     function main()
     {
         try{
+        if(RUN_KEY != window.run_key) return;
         if(mainMenu.active) mainMenu();
         else if(worldSelect.active) worldSelect();
         else world();
@@ -825,10 +848,6 @@ var TIME = 0;
         }catch(err) {console.error(err)}
     }
     var world = function world() {
-        if(++TIME % 10 == 0) {
-            canvas.width = game.width;
-        }
-        if(TIME >= 1000) TIME = 0;
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, innerWidth, innerHeight);
 
@@ -3130,6 +3149,7 @@ var TEAM = {
                 mnu = 0;
                 loadedWorld = -1;
                 loadedLevel = -1;
+
                 loader.load();
                 worldSelect.active = false;
                 player = new Gunner().spawn();

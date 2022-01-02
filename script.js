@@ -825,7 +825,7 @@ var TIME = 0;
         }catch(err) {console.error(err)}
     }
     var world = function world() {
-        if(++TIME % 100 == 0) {
+        if(++TIME % 10 == 0) {
             canvas.width = game.width;
         }
         if(TIME >= 1000) TIME = 0;

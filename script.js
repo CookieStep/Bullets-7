@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.14";
+const gameVersion = "0.0.15";
 const RUN_KEY = Symbol();
 //
 var bullets = [];
@@ -66,6 +66,7 @@ var expert = 1;
                 else{
                     enemies.push(blob);
                     blob.spawned = true;
+                    blob.onSpawned();
                 }
             }
             if(arr.length) {
@@ -967,6 +968,7 @@ var TIME = 0;
             };
             if(keys.use("Backspace") || Menu) {
                 worldSelect.active = true;
+                bosses.clear();
             }
             if(keys.use("Space") || X_button) {
                 var allDead = true;
@@ -1198,8 +1200,18 @@ var TIME = 0;
 
         ctx.resetTransform();
 
-        for(let blob of enemies) {
+        for(let i = 0, e = enemies.length; i < e; i++)
+        {
+            let blob = enemies[i];
             blob.step();
+            if(blob.dead) continue;
+            for(let j = 0; j < i; j++)
+            {
+                let them = enemies[j];
+                if(them.dead) continue;
+                blob.register(them);
+                them.register(blob);
+            }
         }
         for(let a = 0; a < game.steps; a++) {
             for(let i = 0, e = enemies.length; i < e; i++)
@@ -1238,9 +1250,38 @@ var TIME = 0;
                 blob.undo = false;
             }
         }
+        {
+            let i = 0;
+            bosses.forEach(blob => {
+                var l = 5;
+                var w = game.width * 5/8;
+                var x = (game.width - w)/2;
+                var h = scale*.75;
+                var y = game.height - (i * 1.5 + 1) * h - l/2;
+                ctx.strokeStyle = blob.color;
+                ctx.fillStyle = blob.color2 || blob.color;
+                ctx.lineWidth = l;
+                var hp = blob.hp;
+                if(hp < 0) hp = 0;
+                ctx.fillRect(x, y, w * (hp/blob.xhp), h);
+                // if(blob.hp2) {
+                //     var hp = blob.hp2;
+                //     if(hp < 0) hp = 0;
+                //     ctx.fillStyle = blob.color3 || blob.color2 || blob.color;
+                //     ctx.fillRect(x, y, w * (hp/blob.xHp), h);
+                // }
+                ctx.strokeRect(x, y, w, h);
+                blob?.drawBossIcon(ctx, x-h*.5, y, h);
+                if(!enemies.includes(blob)) {
+                    bosses.delete(blob);
+                }
+                ++i;
+            });
+        }
         if(!worldSelect.active) for(let blob of enemies) {
             blob.draw();
         }
+        ctx.resetTransform();
         enemies = enemies.filter(blob => !blob.remove);
         // ctx.strokeStyle = "red";
         // ctx.lineWidth = 1;
@@ -1355,6 +1396,7 @@ function Hex(binary) {
 function Binary(hex) {
     return [...hex].map(hex => binary(hex)).join("");
 }
+var bosses = new Set;
 //entity.js
 {
     var Entity = class Entity
@@ -1362,6 +1404,7 @@ function Binary(hex) {
         register(enemy) {}
         onCollide() {
         }
+        onSpawned() {}
         clipSight() {
             let rads = [];
             let dis = 50;
@@ -1684,7 +1727,7 @@ function Binary(hex) {
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
-        pen(ctx=game.ctx, {fill, stroke, scale=1, shape:shp=this.shape, r=0}, hp)
+        pen(ctx=game.ctx, {fill, stroke, scale=1, shape:shp=this.shape, r=0}, hp, zoom=1)
         {
             var {x, y, s, alpha=1} = this;
             if(scale != 1) {
@@ -1696,7 +1739,9 @@ function Binary(hex) {
             }
             ctx.lineWidth = 0.1/scale;
             ctx.globalAlpha = alpha;
-            game.zoom(x, y, s, s, r, 0, 0, ctx);
+            var {zoom=1} = this;
+            if(zoom) game.zoom(x, y, s, s, r, 0, 0, ctx);
+            else ctx.zoom(x, y, s, s, r);
             if(!isNaN(hp)) {
                 if(this.hp < this.xhp) {
                     ctx.save();
@@ -1876,6 +1921,7 @@ function Binary(hex) {
                 this.dead = 1;
                 this.m /= 10;
                 this.team = 0;
+                this.hits = 0;
                 this.coll = 0;
             }
         }
@@ -2095,6 +2141,18 @@ var dead = (num, dual) => {
                 }
             }
         }
+        hitWall(x, y)
+        {
+            if(x)
+            {
+                this.vx = abs(this.vx) * x * this.wb;
+            }
+            if(y)
+            {
+                this.vy = abs(this.vy) * y * this.wb;
+            }
+        }
+        wb = 1;
         stats() {
             super.stats();
             if(this.lastShot) --this.lastShot;
@@ -2105,6 +2163,7 @@ var dead = (num, dual) => {
                 this.team = 0;
                 this.hits = 0;
                 this.coll = 0;
+                this.wb = 0;
                 this.alpha = .2;
             }else if(this.lastSkill) {
                 this.alpha = 1;
@@ -2112,18 +2171,20 @@ var dead = (num, dual) => {
                 this.team = TEAM.GOOD | TEAM.ALLY;
                 this.hits = TEAM.BAD;
                 this.coll = TEAM.ALLY | TEAM.ENEMY;
+                this.wb = 1;
             }else{
                 this.alpha = 1;
                 this.color2 = this.read;
                 this.team = TEAM.GOOD | TEAM.ALLY;
                 this.hits = TEAM.BAD;
                 this.coll = TEAM.ALLY | TEAM.ENEMY;
+                this.wb = 1;
             }
         }
         ability(key, mrad, srad) {
             if(!this.lastSkill) {
                 if(!isNaN(mrad)) {
-                    this.move(mrad, 12);
+                    this.move(mrad, 15);
                 }
                 this.lastSkill = 40;
             }
@@ -2135,7 +2196,7 @@ var dead = (num, dual) => {
                 blob.team = TEAM.GOOD | TEAM.BULLET;
                 blob.hits = TEAM.BAD;
                 blob.coll = TEAM.ALLY | TEAM.ENEMY;
-                blob.nocoll = TEAM.GOOD;
+                blob.nocoll |= TEAM.GOOD;
                 enemies.push(blob);
                 this.lastShot = 15;
             }
@@ -2148,7 +2209,7 @@ var dead = (num, dual) => {
             this.expert = game.expert;
         }
         isPlayer(what) {
-            return (what.team & TEAM.GOOD) && !(what.team & TEAM.BULLET);
+            return (what.team & this.hits) && !(what.team & TEAM.BULLET);
         }
         spawn(tiles) {
             this.mod();
@@ -2168,7 +2229,7 @@ var dead = (num, dual) => {
     var Chill = class Chill extends Enemy{
         color = "#afa";
         register(what) {
-            if((what.team & TEAM.GOOD) && (what.team & TEAM.BULLET)) {
+            if((what.team & this.hits) && (what.team & TEAM.BULLET)) {
                 if(Entity.rawDistance(this, what) > 16) return;
                 if(what.parent) {
                     this.target = what.parent;
@@ -2200,7 +2261,7 @@ var dead = (num, dual) => {
             if(!target) return;
             var rad = Entity.radian(this, target);
             var d = rDis(this.r, rad);
-            var m = 0.1;
+            var m = this.expert? 0.2: 0.1;
             if(abs(d) < m) this.r = rad;
             else this.r += m * sign(d);
 
@@ -2214,7 +2275,7 @@ var dead = (num, dual) => {
                 // this.move(rad + PI, 5);
                 var blob = new Ball(this, rad);
                 blob.nocoll = TEAM.BAD;
-                blob.spd *= 0.7;
+                if(this.expert) blob.spd *= 0.7;
                 // blob.lcoll.set(this, 200);
                 // blob.spd = this.spd;
                 // blob.f = this.f;
@@ -2222,7 +2283,7 @@ var dead = (num, dual) => {
                 // blob.time = 100;
                 // blob.shape = this.shape;
                 enemies.push(blob);
-                this.lastShot = 30;
+                this.lastShot = this.expert? 20: 30;
             }
         }
         constructor() {
@@ -2408,7 +2469,10 @@ var dead = (num, dual) => {
             this.team = parent.team | TEAM.BULLET;
             this.hits = parent.hits;
             this.coll = parent.coll;
+            this.nocoll = TEAM.BULLET;
             Bullet.position(this, r, parent);
+            this.ox = this.x;
+            this.oy = this.y;
         }
         points = [];
         proj = 1;
@@ -2497,8 +2561,10 @@ var dead = (num, dual) => {
             this.team = parent.team | TEAM.BULLET;
             this.hits = parent.hits;
             this.coll = parent.coll;
+            this.expert = false;
             Ball.position(this, r, parent);
         }
+        register() {}
         draw(ctx) {
             var r = atan(this.vy, this.vx)
             this.pen(ctx, {fill: this.color, r}, 0);
@@ -2761,10 +2827,11 @@ var dead = (num, dual) => {
             this.brainPoints = [];
             this.rad = random(PI2);
         }
+        calcs = 8;
         brainMove() {
             var lines = [];
             var max;
-            var add = (PI * 2)/16;
+            var add = (PI * 2)/this.calcs;
             for(let a = 0; a < PI * 2; a += add) {
                 var num = 0;
                 for(let [rad, pow] of this.brainPoints) {
@@ -2879,6 +2946,12 @@ var dead = (num, dual) => {
         color = "#666";
         color2 = "#fa5";
         dist = 10;
+        constructor() {
+            super();
+            if(this.expert) {
+                this.spd *= 1.5;
+            }
+        }
         draw(ctx) {
             Turret.prototype.draw.call(this, ctx);
         }
@@ -2956,16 +3029,25 @@ var dead = (num, dual) => {
             super(r);
             this.spd *= 1.4;
         }
+        onSpawned() {
+            bosses.add(this);
+        }
         time = 0;
         phase = 2;
         step(m) {
             super.step(m);
             delete this.player;
+            delete this.clo2;
         }
         register(what) {
             if(this.expert) super.register(what);
-            if(!this.isPlayer(what)) return;
-            this.player = what;
+            if(this.isPlayer(what)) {
+                var dis = Entity.rawDistance(this, what)
+                if(!this.clo2 || dis < this.clo2) {
+                    this.player = what;
+                    this.clo2 = dis;
+                }
+            }
         }
         onHit(atk, who) {
             super.onHit(atk, who);
@@ -3031,6 +3113,9 @@ var dead = (num, dual) => {
                 break;
             }
         }
+        drawBossIcon(ctx, x, y, s) {
+            this.drawWith(ctx, {x, y, s, alpha: 1, zoom: 0, vx: 0, vy: 0, hp: this.xhp});
+        }
         summon(cla) {
             if(!this.spawned) return;
             var blob = new cla();
@@ -3047,19 +3132,42 @@ var dead = (num, dual) => {
         xhp = 10;
         s = 0.8;
         m = 0.2;
-        color = "#970";
-        color2 = "#aa0"
+        color = "#666";
+        color2 = "#55f";
         time = 0;
         phase = 0;
         dist = 20;
+        calcs = 16;
         r = 0;
+        constructor() {
+            super();
+            if(this.expert) {
+                this.spd /= 1.5;
+            }
+        }
+        drawBossIcon(ctx, x, y, s) {
+            var obj = {x, y, s, alpha: 1, zoom: 0, vx: 0, vy: 0, hp: this.xhp, r: 0};
+            obj = {...this, ...obj};
+            obj.pen = this.pen;
+            super.draw.call(obj, ctx);
+        }
+        onSpawned() {
+            bosses.add(this);
+        }
         step(m) {
             super.step(m);
             delete this.player;
+            delete this.clo2;
         }
         register(what) {
             super.register(what);
-            if(this.isPlayer(what)) this.player = what;
+            if(this.isPlayer(what)) {
+                var dis = Entity.rawDistance(this, what);
+                if(!this.clo2 || dis < this.clo2) {
+                    this.player = what;
+                    this.clo2 = dis;
+                }
+            }
         }
         draw(ctx) {
             super.draw(ctx);
@@ -3078,8 +3186,8 @@ var dead = (num, dual) => {
             }
         }
         tick(tiles) {
-            var {target, player, teleport} = this;
-            this.color2 = this.color;
+            var {target, player, teleport, expert} = this;
+            this.color2 = "#55f";
             switch(this.phase) {
                 case 0:if(player) {
                     let {x, y} = player;
@@ -3089,7 +3197,7 @@ var dead = (num, dual) => {
                     this.phase = 1;
                     this.time = 0;
                 }break;
-                case 1:if(++this.time == 50) {
+                case 1:if(++this.time == (expert? 20: 50)) {
                     this.x = teleport.x;
                     this.y = teleport.y;
                     this.wallInv = 1;
@@ -3099,15 +3207,15 @@ var dead = (num, dual) => {
                     this.time = 0;
                 }break;
                 case 2:
-                    if(player && ++this.time <= 30 && this.time % 5 == 0) {
+                    if(player && ++this.time <= (expert? 40: 30) && this.time % 5 == 0) {
                         let rad = Entity.radian(this, player);
                         let blob = new Ball(this, rad);
-                        blob.time = 200;
+                        blob.time = expert? 130: 200;
                         blob.move(rad, 25);
                         blob.nocoll = TEAM.BAD;
                         enemies.push(blob);
                     }
-                    if(this.time > 100) {
+                    if(this.time > 125) {
                         this.color2 = "red";
                     }
                     super.tick(tiles);
@@ -3333,7 +3441,7 @@ var dead = (num, dual) => {
         }
     };
     let worlds = [tutorial, test];
-    let selectedWorld = 1;
+    let selectedWorld = 0;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;

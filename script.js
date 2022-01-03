@@ -2229,7 +2229,7 @@ var dead = (num, dual) => {
     var Chill = class Chill extends Enemy{
         color = "#afa";
         register(what) {
-            if((what.team & this.hits) && (what.team & TEAM.BULLET)) {
+            if(this.expert && (what.team & this.hits) && (what.team & TEAM.BULLET)) {
                 if(Entity.rawDistance(this, what) > 16) return;
                 if(what.parent) {
                     this.target = what.parent;
@@ -2238,7 +2238,7 @@ var dead = (num, dual) => {
         }
         tick() {
             var {target} = this;
-            if(target) {
+            if(this.expert && target) {
                 var rad = Entity.radian(this, target);
                 this.move(rad);
                 if(target.dead) {
@@ -3441,7 +3441,7 @@ var dead = (num, dual) => {
         }
     };
     let worlds = [tutorial, test];
-    let selectedWorld = 0;
+    let selectedWorld = 1;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;

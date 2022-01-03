@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.12";
+const gameVersion = "0.0.14";
 const RUN_KEY = Symbol();
 //
 var bullets = [];
@@ -14,16 +14,36 @@ var panSpeed = 0.2;
 var zoomSpeed = 0.1;
 var level = 1;
 var player;
+var mains = [];
 var creator = window.creator;
 var edit;
 var DEAD = 10;
+var multi = 0;
+var maxPlayers = 1;
+var expert = 1;
 
+{
+    var gamepad;
+    var gamepads = [];
+    addEventListener("gamepadconnected", ({gamepad: {index}}) => {
+        gamepad = index;
+        gamepads.push(index);
+        multi = gamepads.length;
+        multi %= maxPlayers;
+    });
+    addEventListener("gamepaddisconnected", ({gamepad: {index}}) => {
+        gamepads = gamepads.filter(id => id != index);
+        multi = gamepads.length;
+        multi %= maxPlayers;
+    });
+}
 {
     // let canv = document.createElement("canvas");
     // let octx = canv.getContext("2d");
     var loader = {
         load() {
             mapTiles = this.tiles;
+            game.expert = this.expert;
             if(worldSelect.active) enemies = [];
             for(let enemy of enemies) {
                 if(enemy.inWall() && !enemy.wallInv) {
@@ -32,8 +52,9 @@ var DEAD = 10;
             }
             this.delay = 0;
             var arr = [];
-            if(worldSelect.active) enemies = this.enemies;
-            else for(let blob of this.enemies) {
+            if(worldSelect.active) {
+                enemies = this.enemies;
+            }else for(let blob of this.enemies) {
                 var hit = false;
                 for(let them of enemies) {
                     if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
@@ -42,7 +63,10 @@ var DEAD = 10;
                     }
                 }
                 if(hit) arr.push(blob);
-                else enemies.push(blob);
+                else{
+                    enemies.push(blob);
+                    blob.spawned = true;
+                }
             }
             if(arr.length) {
                 this.enemies = arr;
@@ -119,7 +143,7 @@ var DEAD = 10;
         };
     }
     /**@param {(value: number, obj: Slider) => string} script*/
-    function Slider({min, max, inc}, script, loader) {
+    function Slider({min=0, max=1, inc=1}, script, loader) {
         this.value = min;
         this.use = (input=1) => {
             if(input == Input.Up) this.set(max, this);
@@ -168,6 +192,17 @@ var DEAD = 10;
         }
         return `Zoom: ${value.toFixed(1)}`;
     }, () => +load("cam.zoom") || 1);
+    let expertOpt = new Toggle(value => {
+        if(value) {
+            save("expert", 1);
+            expert = 1;
+            return "Expert mode";
+        }else{
+            save("expert", 0);
+            expert = 0;
+            return "Normal mode"
+        }
+    }, () => +load("expert"));
     var Settings = new Menu("Settings",
         new Toggle(value => {
             if(value) {
@@ -191,10 +226,19 @@ var DEAD = 10;
             zoomSpeed = value;
             save("cam.focus", value.toFixed(1));
             return `Zoom Speed: ${value.toFixed(1)}`;
-        }, () => +load("cam.focus") || 0.1)
+        }, () => +load("cam.focus") || 0.1),
+        new Slider({min: 1, max: 8}, value => {
+            maxPlayers = value;
+            multi = gamepads.length;
+            multi %= maxPlayers;
+            save("max.players", value);
+            return `Max players: ${value}`
+        }, () => +load("max.players") || 8),
+        expertOpt
     );
     var setCam = i => camOpt.set(i);
     var modZoom = i => zoomOpt.use(i);
+    var toggleExpert = () => expertOpt.use();
     var mainMenu = function settings() {
         var menu = Settings;
         ctx.fillStyle = "#000";
@@ -316,7 +360,7 @@ var DEAD = 10;
         if(keys.use("KeyD")) {
             menu.item = menu.items.length - 1;
         }
-        if(keys.hold("Escape")) {
+        if(keys.use("Escape")) {
             mainMenu.active = false;
         }
 
@@ -337,6 +381,7 @@ var DEAD = 10;
     if(Enviroment == "Sololearn") gone = true;
     onblur = () => {
         gone = true;
+        keys.clear();
     };
     onfocus = () => {
         gone = false;
@@ -504,8 +549,14 @@ var DEAD = 10;
                     let s = 1/scale;
                     game.x = (game.zw - (innerWidth * s)) * -.5;
                     game.y = (game.zh - (innerHeight * s)) * -.5;
+                    let x = 0;
+                    let y = 0;
+                    s = 0;
+                    for(let blob of mains) {
+
+                    }
                     // var player = enemies[0];
-                    s = player.s * .5;
+                    // s = player.s * .5;
                     game.x += game.zw * .5 - player.x - s;
                     game.y += game.zh * .5 - player.y - s;
                 }
@@ -528,7 +579,7 @@ var DEAD = 10;
                     game.y -= y;
                 }
                 if(cameraState == "auto") {
-                    let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.dead ||blob.remove || (blob.team & TEAM.BULLET)));
+                    let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.remove || (blob.team & TEAM.BULLET)));
                     let p = 1;
                     if(loader.delay > 1 || !arr.length) {
                         minX = -p;
@@ -875,10 +926,10 @@ var TIME = 0;
                             // mapTiles[i] = 0;
                             // // mouse.d = 0;
                             edit = !edit;
-                            if(!enemies.includes(player)) {
-                                enemies.push(player);
-                                player.remove = false;
-                            }
+                            // if(!enemies.includes(player)) {
+                            //     enemies.push(player);
+                            //     player.remove = false;
+                            // }
                         }
                     }
                     lastI = i;
@@ -903,20 +954,35 @@ var TIME = 0;
             if(keys.use("Enter")) {
                 console.log(Hex(mapTiles.join("")));
             }
-            if(keys.use("Backspace")) {
+            var X_button = false;
+            var Menu = false;
+            let pads = navigator.getGamepads?.();
+            if(pads) for(let pad of pads) {
+                if(pad?.buttons[2].value) {
+                    X_button = true;
+                }
+                if(pad?.buttons[8].value) {
+                    Menu = true;
+                }
+            };
+            if(keys.use("Backspace") || Menu) {
                 worldSelect.active = true;
             }
-            if(keys.use("Space")) {
-                if(player.remove) {
+            if(keys.use("Space") || X_button) {
+                var allDead = true;
+                for(let blob of mains) {
+                    if(!blob.dead) {
+                        allDead = false;
+                        break;
+                    }
+                }
+                if(allDead) {
                     --level;
                     mapTiles = [];
-                    player.remove = false;
-                    player.dead = 0;
-                    player.hp = 1;
                     loader.enemies = [];
                     loader.tiles = [];
                     loader.load();
-                    enemies = [player];
+                    worldSelect.spawn();
                 }
             }
         }
@@ -1421,12 +1487,17 @@ function Binary(hex) {
             this.vy *= this.f;
             if(!this.dead) this.tick?.(tiles);
             if(this.dead) ++this.dead;
-            if(this.dead >= DEAD) this.remove = 1;
+            if(this.dead >= DEAD) {
+                this.delete();
+            }
             if(this.wallInv > 0) {
                 if(!this.inWall(0, tiles)) {
                     this.wallInv = 0;
                 }else this.wallTick();
             }
+        }
+        delete() {
+            this.remove = 1;
         }
         update(m=1, tiles=mapTiles)
         {
@@ -1833,6 +1904,12 @@ var TEAM = {
     ENEMY : 1 << 3,
     BULLET: 1 << 4
 };
+var deadzone = 0.1;
+var dead = (num, dual) => {
+    if(num < deadzone && (!dual || num > -deadzone)) return 0;
+    if(num > 1 - deadzone || (dual && num < deadzone - 1)) return sign(num);
+    return num / (1 - deadzone);
+}
 //player.js
 {
     var Player = class Player extends Entity
@@ -1840,10 +1917,101 @@ var TEAM = {
         color = "#55f";
         color2 = "#aaf";
         shape = "square.3";
+        constructor(id=0) {
+            super();
+            this.id = id;
+            if(multi) {
+                this.hue = (id/(multi + 1)) * 360;
+                this.safe = 360/((multi + 1) * 4);
+            }
+        }
+        delete() {
+            this.dead = 1;
+        }
+        spawn() {
+            this.x = (game.w-this.s)*.5;
+            this.y = (game.h-this.s)*.5;
+            if(multi) {
+                let m = this.id/(multi+1);
+                let r = PI2 * m + PI*1.5;
+                if(multi == 1) r -= PI*.5;
+                let d = multi**.5 * .4;
+                let c = cos(r) * d;
+                let s = sin(r) * d;
+                this.x += c;
+                this.y += s;
+            }
+            return this;
+        }
         tick()
         {
-            this.keys();
+            if(this.id == gamepads.length) this.keys();
+            else this.pad();
             this.stats();
+        }
+        update(m, t) {
+            super.update(m, t);
+            if(this.dead) for(let main of mains) {
+                if(!main.dead && Entity.isTouching(main, this)) {
+                    this.revive();
+                }
+            }
+        }
+        pad() {
+            var pads = navigator.getGamepads?.();
+            var pad = pads?.[gamepads[this.id]];
+            
+            if(!pad) return;
+
+            var x = dead(pad.axes[0], 1);
+            var y = dead(pad.axes[1], 1);
+
+            var dis = dist(x, y);
+            var rad = atan(y, x);
+            if(dis > 1) dis = 1;
+            if(dis > 0.1) {
+                this.mrad = rad;
+                this.move(rad, dis);
+            }
+
+            var x = pad.axes[2];
+            var y = pad.axes[3];
+
+            var dis2 = dist(x, y);
+
+            var mx = (this.x + this.s * .5);
+            var my = (this.y + this.s * .5);
+
+            ctx.lineWidth = .4 * this.s;
+            ctx.beginPath();
+            game.scale();
+            ctx.globalAlpha = this.alpha;
+            ctx.moveTo(mx, my);
+            ctx.lineTo(mx + x*this.s*1.5, my + y*this.s*1.5);
+
+            var RT = dead(pad.buttons[7].value);
+            if(dis2 && RT) {
+                this.skill(atan(y, x));
+                ctx.strokeStyle = this.color2;
+            }else ctx.strokeStyle = this.color;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.resetTransform();
+
+            var A = pad.buttons[0].value;
+            var LT = dead(pad.buttons[6].value);
+            if(A || LT) {
+                if(this.ab) this.ab = 3;
+                else this.ab = 1;
+                this.ability(this.ab, dis? rad: dis, atan(y, x));
+            }else this.ab = 0;
+        }
+        revive() {
+            this.dead = 0;
+            this.hp = this.xhp;
+            this.team = TEAM.GOOD | TEAM.ALLY;
+            this.coll = TEAM.ALLY | TEAM.ENEMY;
+            this.hits = TEAM.BAD;
         }
         skill(rad) {}
         stats() {
@@ -1903,6 +2071,18 @@ var TEAM = {
         hits = TEAM.BAD;
     }
     var Gunner = class Gunner extends Player{
+        rech = "#faa";
+        constructor(id) {
+            super(id);
+            if(multi) {
+                var {hue, safe} = this;
+                hue += safe * .5;
+                this.color = `hsl(${hue}, 100%, 50%)`;
+                this.color2 = `hsl(${hue}, 100%, 80%)`;
+                this.rech = `hsl(${hue+safe}, 100%, 80%)`;
+            }
+            this.read = this.color2;
+        }
         draw(ctx) {
             var r = atan(this.vy, this.vx);
             this.pen(ctx, {fill: this.color, r}, 0);
@@ -1920,7 +2100,7 @@ var TEAM = {
             if(this.lastShot) --this.lastShot;
 
             if(this.lastSkill > 30) {
-                this.color2 = "#f55";
+                this.color2 = this.rech;
                 this.r = this.lastSkill * .5;
                 this.team = 0;
                 this.hits = 0;
@@ -1928,14 +2108,14 @@ var TEAM = {
                 this.alpha = .2;
             }else if(this.lastSkill) {
                 this.alpha = 1;
-                this.color2 = "#f55";
-                this.team = TEAM.GOOD;
+                this.color2 = this.rech;
+                this.team = TEAM.GOOD | TEAM.ALLY;
                 this.hits = TEAM.BAD;
                 this.coll = TEAM.ALLY | TEAM.ENEMY;
             }else{
                 this.alpha = 1;
-                this.color2 = "#aaf";
-                this.team = TEAM.GOOD;
+                this.color2 = this.read;
+                this.team = TEAM.GOOD | TEAM.ALLY;
                 this.hits = TEAM.BAD;
                 this.coll = TEAM.ALLY | TEAM.ENEMY;
             }
@@ -1963,8 +2143,21 @@ var TEAM = {
     };
     var Enemy = class Enemy extends Entity
     {
+        constructor() {
+            super();
+            this.expert = game.expert;
+        }
         isPlayer(what) {
             return (what.team & TEAM.GOOD) && !(what.team & TEAM.BULLET);
+        }
+        spawn(tiles) {
+            this.mod();
+            super.spawn(tiles);
+        }
+        mod() {
+            var mod = mains.length;
+            this.hp *= mod;
+            this.xhp *= mod;
         }
         color = "red";
         team = TEAM.ENEMY | TEAM.BAD;
@@ -1974,6 +2167,24 @@ var TEAM = {
     };
     var Chill = class Chill extends Enemy{
         color = "#afa";
+        register(what) {
+            if((what.team & TEAM.GOOD) && (what.team & TEAM.BULLET)) {
+                if(Entity.rawDistance(this, what) > 16) return;
+                if(what.parent) {
+                    this.target = what.parent;
+                }
+            }
+        }
+        tick() {
+            var {target} = this;
+            if(target) {
+                var rad = Entity.radian(this, target);
+                this.move(rad);
+                if(target.dead) {
+                    delete this.target;
+                }
+            }
+        }
     };
     var Turret = class Turret extends Enemy{
         shape = 'square.4';
@@ -2129,7 +2340,27 @@ var TEAM = {
         }
         tick()
         {
-            this.move(atan(this.vy, this.vx));
+            if(this.expert && this.target) {
+                var what = this.target;
+                var dis = Entity.rawDistance(this, what);
+                this.clo = dis;
+                var rad = Entity.radian(this, what);
+                this.move(rad);
+                if(dis > 25 || what.dead || !this.sightCheck(what)) {
+                    delete this.target;
+                    this.clo = 100;
+                }
+            }else this.move(atan(this.vy, this.vx));
+        }
+        clo = 100;
+        register(what) {
+            if(!this.expert) return;
+            var dis = Entity.rawDistance(this, what);
+            if(this.isPlayer(what) && dis < 25 && dis < this.clo) {
+                if(!this.sightCheck(what)) return;
+                this.target = what;
+                this.clo = dis;
+            }
         }
         color = "#ff5";
         shape = "square.4";
@@ -2179,6 +2410,8 @@ var TEAM = {
             this.coll = parent.coll;
             Bullet.position(this, r, parent);
         }
+        points = [];
+        proj = 1;
         tick() {
             super.tick();
             if(this.time) --this.time;
@@ -2292,6 +2525,10 @@ var TEAM = {
         m = 0.1;
     }
     var Wall = class Wall extends Mover{
+        constructor() {
+            super();
+            if(this.expert) this.spd *= 1.5;
+        }
         tick(tiles=mapTiles) {
             var s = this.s * .5;
             var mx = this.x + s;
@@ -2377,7 +2614,7 @@ var TEAM = {
                     cho = weight(obj);
                     // if(options.size > 2) {
                         this.last = cho;
-                        this.lastT = 40;
+                        this.lastT = this.expert? 8: 30;
                     // }
                     this.move(cho);
                 }else{
@@ -2723,14 +2960,18 @@ var TEAM = {
         phase = 2;
         step(m) {
             super.step(m);
-            delete this.target;
+            delete this.player;
         }
         register(what) {
+            if(this.expert) super.register(what);
             if(!this.isPlayer(what)) return;
-            this.target = what;
+            this.player = what;
         }
         onHit(atk, who) {
             super.onHit(atk, who);
+            if(!this.expert) {
+                this.time = 0;
+            }
             if(this.phase == 0) {
                 ++this.phase;
                 this.time = 0;
@@ -2749,34 +2990,56 @@ var TEAM = {
             }
         }
         tick() {
-            var {target} = this;
+            var {player: target, expert} = this;
             switch(this.phase) {
                 case 0:if(target) {
                     var rad = Entity.radian(this, target);
-                    this.move(rad);
+                    this.move(rad, expert? 2: 1);
+                    if(this.expert && ++this.time % 30 == 0) {
+                        this.summon(Wall);
+                    }
                 }break;
                 case 1:
                     ++this.time;
-                    if(this.time >= 30) {
-                        for(let i = 0; i < 4; i++) {
-                            let r = PI*.5*i;
-                            var blob = new Mover();
-                            blob.color = this.color;
-                            blob.color2 = this.color2;
-                            Bullet.position(blob, r, this);
-                            blob.nocoll = TEAM.BAD;
-                            enemies.push(blob);
+                    if(expert) {
+                        if(this.time % 20 == 0) {
+                            this.summon(Mover);
                         }
-                        ++this.phase;
-                        this.time = 0;
-                        this.color = "#ff5";
-                        this.color2 = "#aa0";
+                        if(this.time >= 80) {
+                            ++this.phase;
+                            this.time = 0;
+                            this.color = "#ff5";
+                            this.color2 = "#aa0";
+                        }
+                    }else{
+                        if(this.time >= 30) {
+                            for(let i = 0; i < 4; i++) {
+                                this.summon(Mover);
+                            }
+                            ++this.phase;
+                            this.time = 0;
+                            this.color = "#ff5";
+                            this.color2 = "#aa0";
+                        }
                     }
                 break;
                 case 2:
                     super.tick();
+                    if(this.expert && ++this.time % 40 == 0) {
+                        this.summon(Chill);
+                    }
                 break;
             }
+        }
+        summon(cla) {
+            if(!this.spawned) return;
+            var blob = new cla();
+            blob.mod();
+            blob.color = this.color;
+            blob.color2 = this.color2;
+            Bullet.position(blob, 0, this);
+            blob.nocoll = TEAM.BAD;
+            enemies.push(blob);
         }
     };
     var TurretBoss = class extends Chaser{
@@ -2872,6 +3135,7 @@ var TEAM = {
         loader.color = world.color;
         loader.color2 = world.color2;
         loader.dir = 0;
+        loader.expert = expert;
         var {spawn=[], tiles="", seed} = obj;
         if(seed) lehmer.seed = seed;
         var layout = Binary(tiles);
@@ -3036,6 +3300,38 @@ var TEAM = {
             }
         }
     }
+    let pads = [];
+    let PadTracker = class PadTracker{
+        constructor(id) {
+            this.id = id;
+        }
+        button = new Map;
+        update() {
+            var pads = navigator.getGamepads?.();
+            var pad = pads?.[gamepads[this.id]];
+            if(!pad) return;
+
+            for(let i in pad.buttons) {
+                let button = pad.buttons[i];
+                if(button.value) {
+                    if(this.button.has(i)) {
+                        this.button.set(i, 3);
+                    }else{
+                        this.button.set(i, 1);
+                    }
+                }else if(this.button.has(i)) {
+                    this.button.delete(i);
+                    // console.log(i);
+                }
+            }
+        }
+        use(button) {
+            button = button+"";
+            if(this.button.get(button) == 1) {
+                return this.button.set(button, 2);
+            }
+        }
+    };
     let worlds = [tutorial, test];
     let selectedWorld = 1;
     let loadedWorld = -1;
@@ -3128,19 +3424,49 @@ var TEAM = {
             ctx.fillText(label, (game.width-wid)*.5, h * 9.4);
         }
 
-        if(keys.use("ArrowRight")) {
+        while(pads.length < gamepads.length) {
+            pads.push(new PadTracker(pads.length));
+        }
+
+        var A_button = false;
+        var B_button = false;
+        var Left = false;
+        var Right = false;
+        for(let pad of pads) {
+            pad.update();
+            if(pad.use(0)) {
+                A_button = true;
+            }
+            if(pad.use(1)) {
+                B_button = true;
+            }
+            if(pad.use(14)) {
+                Left = true;
+            }
+            if(pad.use(15)) {
+                Right = true;
+            }
+        };
+        if(keys.use("ArrowRight") || Right) {
             if(mnu) selectedLevel = loop(sworld+1, wrlds.length);
             else selectedWorld = loop(sworld + 1, wrlds.length);
             dir = 1;
             if(loader.delay) loader.load();
         }
-        if(keys.use("ArrowLeft")) {
+        if(keys.use("ArrowLeft") || Left) {
             if(mnu) selectedLevel = loop(sworld-1, wrlds.length);
             else selectedWorld = loop(sworld + 1, wrlds.length);
             dir = -1;
             if(loader.delay) loader.load();
         }
-        if(keys.use("Space")) {
+        if(keys.use("Backspace") || B_button) {
+            if(mnu) {
+                loadedLevel = -1;
+                mnu = 0;
+                if(loader.delay) loader.load();
+            }
+        }
+        if(keys.use("Space") || A_button) {
             if(mnu == 0) {
                 mnu = 1;
                 loadedWorld = -1;
@@ -3152,12 +3478,22 @@ var TEAM = {
 
                 loader.load();
                 worldSelect.active = false;
-                player = new Gunner().spawn();
-                enemies = [player];
+                worldSelect.spawn();
                 level = selectedLevel;
                 game.stepM = 1;
             }
         }
+        if(keys.use("Escape")) {
+            mainMenu.active = true;
+        }
+    };
+    worldSelect.spawn = function() {
+        enemies = [];
+        mains = [];
+        for(let i = 0; i <= multi; i++) {
+            mains.push(new Gunner(i).spawn());
+        }
+        enemies = mains;
     };
     worldSelect.active = true;
 };

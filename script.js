@@ -1,7 +1,7 @@
 "use strict";
-const gameVersion = "0.0.15";
+const gameVersion = "0.0.20";
 const RUN_KEY = Symbol();
-//
+
 var bullets = [];
 var enemies = [];
 
@@ -18,23 +18,138 @@ var mains = [];
 var creator = window.creator;
 var edit;
 var DEAD = 10;
-var multi = 0;
+var multi;
 var maxPlayers = 1;
-var expert = 1;
+var expert;
+var Host;
 
+function getExtras() {
+    return gamepads.length + online.size;
+}
+{
+    class Pointer{
+        /**@param {Touch} touch*/
+        constructor(touch) {
+            this.id = touch.identifier;
+            this.sx = touch.pageX;
+            this.sy = touch.pageY;
+            this.x = this.sx;
+            this.y = this.sy;
+            this.up = false;
+            this.canceled = false;
+            this.used = false;
+            this.start = Date.now();
+        }
+        update(touch) {
+            this.x = touch.pageX;
+            this.y = touch.pageY;
+        }
+        get end() {
+            return this.up || this.canceled;
+        }
+        get mx() {
+            return this.x - this.sx;
+        }
+        get my() {
+            return this.y - this.sy;
+        }
+    }
+    var mobile;
+    var touches = new (class TouchMap extends Map {
+        /**@returns {Pointer}*/
+        get(id) {return super.get(id)}
+        /**@returns {IterableIterator<Pointer>}*/
+        get all() {return super.values()}
+        /**@returns {Pointer}*/
+        add(touch) {return super.set(touch.id, touch)}
+        /**@returns {Pointer}*/
+        find(test) {for(let touch of this.values())
+            if(test(touch)) return touch;
+        }
+    })();
+    /**@param {Touch} touch*/
+    let touchstart = function(touch) {
+        var pointer = new Pointer(touch);
+        touches.add(pointer);
+        //if(pointer.id) mobile = true;
+    };
+    /**@param {Touch} touch*/
+    let touchmove = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.update(touch);
+    };
+    /**@param {Touch} touch*/
+    let touchend = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.up = true;
+    };
+    /**@param {Touch} touch*/
+    let touchcancel = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.canceled = true;
+    };
+    if("ontouchstart" in window) {
+        ontouchstart = e => [...e.changedTouches].forEach(touchstart);
+        ontouchmove = e => [...e.changedTouches].forEach(touchmove);
+        ontouchend = e => [...e.changedTouches].forEach(touchend);
+        ontouchcancel = (e) => [...e.changedTouches].forEach(touchcancel);
+        //onmousedown = e => !mobile && touchstart(e);
+        //onmousemove = e => !mobile && touches.has(undefined) && touchmove(e);
+        //onmouseup = e => !mobile && touchend(e);
+    }
+}
+{
+    var showButtons = 0;
+    var Button = class Button{
+        constructor(x, y, w, h) {
+            this.resize(x, y, w, h);
+        }
+        x = 0; y = 0;
+        w = 0; h = 0;
+        /**@param {Pointer} touch*/
+        includes(touch) {
+            return touch.x > this.x       &&
+                touch.y > this.y          &&
+                touch.x < this.x + this.w &&
+                touch.y < this.y + this.h;
+        }
+        resize(x, y, w, h) {
+            Object.assign(this, {x, y, w, h});
+        }
+        draw(color="red") {
+            if(!showButtons) return;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
+        }
+    }
+    /**@param {Button} button*/
+    var buttonClick = function buttonClick(button) {
+        for(let touch of touches.all) {
+            if(touch.up && !touch.used && button.includes(touch)) {
+                touch.used = true;
+                return true;
+            }
+        }
+    }
+}
 {
     var gamepad;
     var gamepads = [];
     addEventListener("gamepadconnected", ({gamepad: {index}}) => {
         gamepad = index;
         gamepads.push(index);
-        multi = gamepads.length;
-        multi %= maxPlayers;
+        multi = getExtras();
+        if(multi >= maxPlayers) {
+            multi = maxPlayers-1;
+        }
     });
     addEventListener("gamepaddisconnected", ({gamepad: {index}}) => {
         gamepads = gamepads.filter(id => id != index);
-        multi = gamepads.length;
-        multi %= maxPlayers;
+        multi = getExtras();
+        if(multi >= maxPlayers) {
+            multi = maxPlayers-1;
+        }
     });
 }
 {
@@ -87,7 +202,57 @@ var expert = 1;
         delay: 0
     }
 }
+{
+    var ws;
+    var wsSetup = function wsSetup(link) {
+        try{
+        ws = new WebSocket("ws://"+link);
+        }catch(err) {
+            try{
+                ws = new WebSocket("wss://"+link);
+            }catch(err) {
+                return;
+            };
+        };
+        ws.open = new Promise(r=>ws.onopen = () => {
+            r();
+            console.log("Connected");
+            sendUpdate();
+        });
+        ws.onclose = err => {
+            console.error("err: "+err);
+            online.clear();
+            Host = 0;
+        }
+        ws.onmessage = (ev) => onData(JSON.parse(ev.data));
+    }
+    var online = new Map;
+    function onData(data) {
+        var {id} = data;
+        if(data.host) Host = data.host;
 
+        if(!("id" in data)) return;
+        if(data.input) {
+            online.set(id, data.input);
+            multi = getExtras();
+            if(multi >= maxPlayers) {
+                multi = maxPlayers-1;
+            }
+        }
+        if(data.close) {
+            online.delete(id);
+            multi = getExtras();
+            if(multi >= maxPlayers) {
+                multi = maxPlayers-1;
+            }
+        }
+        //sendUpdate();
+    }
+    var sendData = async function sendData(obj) {
+        await ws.open;
+        ws.send(JSON.stringify(obj));
+    }
+}
 //menu.js
 {
     function Menu(label, ...items) {
@@ -106,6 +271,11 @@ var expert = 1;
         Up: Symbol(),
         Down: Symbol()
     };
+    function Button(label, script) {
+        this.use = script;
+        this.label = label;
+        this.load = () => 0;
+    }
     /**@param {(value: boolean) => string} script*/
     function Toggle(script, loader) {
         this.value = false;
@@ -230,12 +400,17 @@ var expert = 1;
         }, () => +load("cam.focus") || 0.1),
         new Slider({min: 1, max: 8}, value => {
             maxPlayers = value;
-            multi = gamepads.length;
-            multi %= maxPlayers;
+            multi = getExtras();
+            if(multi >= maxPlayers) {
+                multi = maxPlayers-1;
+            }
             save("max.players", value);
             return `Max players: ${value}`
         }, () => +load("max.players") || 8),
-        expertOpt
+        expertOpt,
+        new Button("Connect to server", () => {
+            wsSetup(prompt("Link to server: "));
+        })
     );
     var setCam = i => camOpt.set(i);
     var modZoom = i => zoomOpt.use(i);
@@ -319,6 +494,11 @@ var expert = 1;
                 ctx.fillStyle = "#33b";
                 ctx.fillRect((w-wid)*.5, y - h * .4, wid2 * item.slider, h/2);
                 ctx.strokeRect((w-wid)*.5, y - h * .4, wid2, h/2);
+            }else if(item instanceof Button) {
+                txt = `${item.label}`;
+                var wid = ctx.measureText(txt).width;
+                ctx.fillStyle = i == menu.item? "#33b": "#555";
+                ctx.fillText(item.label, (w - wid)*.5, y);
             }
             ++i;
         }
@@ -408,7 +588,7 @@ var expert = 1;
     };
     var randomOf = ([...list]) => list[floor(random(list.length))];
     var lrandomOf = ([...list]) => list[floor(lehmer() * (list.length))];
-    var random = (max=1, min=0) => Math.random() * (max - min) + min;
+    var random = (max=1, min=0) => lehmer() * (max - min) + min;
     var rDis = (a, b, c=(PI * 2)) => rotate(loop(b - a, c), c);
     var PI2 = PI * 2;
     var srand = () => {
@@ -444,7 +624,7 @@ var expert = 1;
         tmp = tmp * 0x12fad5c9;
         return 2 * ((tmp >> 16) ^ tmp)/0xffffffff;
     };
-    lehmer.seed = 9;
+    lehmer.seed = floor(random() * 108340204802);
 
     var game = {
         zoom(x, y, l=1, w=1, r, fx, fy, ctx) {
@@ -553,13 +733,20 @@ var expert = 1;
                     let x = 0;
                     let y = 0;
                     s = 0;
-                    for(let blob of mains) {
 
+                    for(let blob of mains) {
+                        x += blob.x;
+                        y += blob.y;
+                        s += blob.s;
                     }
-                    // var player = enemies[0];
-                    // s = player.s * .5;
-                    game.x += game.zw * .5 - player.x - s;
-                    game.y += game.zh * .5 - player.y - s;
+                    
+                    s *= .5;
+                    s /= mains.length;
+                    x /= mains.length;
+                    y /= mains.length;
+
+                    game.x += game.zw * .5 - x - s;
+                    game.y += game.zh * .5 - y - s;
                 }
                 if(cameraState == "mouse") {
                     let s = 1/scale;
@@ -897,6 +1084,9 @@ var TIME = 0;
         else if(worldSelect.active) worldSelect();
         else world();
         nextFrame();
+        if(Host) {
+            sendUpdate();
+        }
         }catch(err) {console.error(err)}
     }
     var world = function world() {
@@ -1286,6 +1476,7 @@ var TIME = 0;
         // ctx.strokeStyle = "red";
         // ctx.lineWidth = 1;
         // ctx.strokeRect(0, 0, innerWidth/2, innerHeight/2);
+        if(Host) sendData({frame: 1});
     }
 }
 //shapes.js
@@ -1359,17 +1550,17 @@ var TIME = 0;
         ctx.quadraticCurveTo(0, 0, r, 0);
     });
     shape("arrow.2", path => {
-		//Top Triangle
-		path.moveTo(1 / 2, 1 / 8);
-		path.lineTo(3 / 4, 2 / 5);
-		path.lineTo(1 / 4, 2 / 5);
-		path.closePath();
-		//Bottom Triangle
-		path.moveTo(1 / 2, 4 / 8);
-		path.lineTo(3 / 4, 4 / 5);
-		path.lineTo(1 / 4, 4 / 5);
-		path.closePath();
-		path.rotation = PI / 2;
+        //Top Triangle
+        path.moveTo(1 / 2, 1 / 8);
+        path.lineTo(3 / 4, 2 / 5);
+        path.lineTo(1 / 4, 2 / 5);
+        path.closePath();
+        //Bottom Triangle
+        path.moveTo(1 / 2, 4 / 8);
+        path.lineTo(3 / 4, 4 / 5);
+        path.lineTo(1 / 4, 4 / 5);
+        path.closePath();
+        path.rotation = PI / 2;
     });
 }
 function hex(byte) {
@@ -1402,8 +1593,7 @@ var bosses = new Set;
     var Entity = class Entity
     {
         register(enemy) {}
-        onCollide() {
-        }
+        onCollide() {}
         onSpawned() {}
         clipSight() {
             let rads = [];
@@ -1530,14 +1720,36 @@ var bosses = new Set;
             this.vy *= this.f;
             if(!this.dead) this.tick?.(tiles);
             if(this.dead) ++this.dead;
-            if(this.dead >= DEAD) {
-                this.delete();
+            if(this.lives) {
+                if(this.dead >= DEAD * (this.expert? 2: 5)) {
+                    this.hp += this.xhp;
+                    this.dead = 0;
+                    --this.lives;
+                }
+            }else{
+                if(this.dead >= DEAD) {
+                    this.delete();
+                }
             }
+            {
+                let hp = this.calculateHp();
+                if(hp <= 0) {
+                    this.lives = 0;
+                    this.hp = 0;
+                }
+            }
+            if(!this.dead && this.hp <= 0) this.dead = 1;
             if(this.wallInv > 0) {
                 if(!this.inWall(0, tiles)) {
                     this.wallInv = 0;
                 }else this.wallTick();
             }
+        }
+        calculateHp() {
+            var xhp = this.xhp;
+            var hpv = this.hp + xhp * this.lives;
+            // xhp *= this.ml;
+            return hpv;
         }
         delete() {
             this.remove = 1;
@@ -1722,8 +1934,8 @@ var bosses = new Set;
         {
             if(a.inv?.has(b)) return;
             if(b.inv?.has(a)) return;
-            if(a.dead || a.remove) return;
-            if(b.dead || b.remove) return;
+            //if(a.dead || a.remove) return;
+            //if(b.dead || b.remove) return;
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
@@ -1738,16 +1950,20 @@ var bosses = new Set;
                 y = my - s *.5;
             }
             ctx.lineWidth = 0.1/scale;
+            if(this.dead) alpha = .5;
             ctx.globalAlpha = alpha;
             var {zoom=1} = this;
             if(zoom) game.zoom(x, y, s, s, r, 0, 0, ctx);
             else ctx.zoom(x, y, s, s, r);
+            var xhp = this.xhp;
+            var hpv = this.hp + xhp * this.lives;
+            xhp *= this.ml;
             if(!isNaN(hp)) {
-                if(this.hp < this.xhp) {
+                if(hpv < xhp) {
                     ctx.save();
                     ctx.beginPath();
                     ctx.moveTo(.5, .5);
-                    ctx.arc(.5, .5, 3, -hp, -hp + PI2 * this.hp/this.xhp);
+                    ctx.arc(.5, .5, 3, -hp, -hp + PI2 * hpv/xhp);
                     ctx.closePath();
                     ctx.clip();
                 }
@@ -1761,7 +1977,7 @@ var bosses = new Set;
                 ctx.stroke(shape(shp));
             }
             if(!isNaN(hp)) {
-                if(this.hp < this.xhp) {
+                if(hpv < xhp) {
                     ctx.restore();
                 }
             }
@@ -1913,16 +2129,21 @@ var bosses = new Set;
             }
         }
         hit(who) {
+            if(this.dead > 1) return;
             who.onHit(this.atk, this);
         }
         onHit(atk=0, who) {
             this.hp -= atk;
             if(this.hp <= 0) {
-                this.dead = 1;
-                this.m /= 10;
-                this.team = 0;
-                this.hits = 0;
-                this.coll = 0;
+                if(!this.lives) {
+                    this.dead = 1;
+                    this.m /= 10;
+                    this.team = TEAM.DEAD;
+                    this.hits = 0;
+                    this.coll = 0;
+                }else{
+                    this.dead = 1;
+                }
             }
         }
         boxes = [this];
@@ -1941,6 +2162,8 @@ var bosses = new Set;
         dead = 0;
         lcoll = new Map;
         s = 0.4;
+        lives = 0;
+        ml = 1;
     }
 }
 var TEAM = {
@@ -1948,7 +2171,8 @@ var TEAM = {
     ALLY  : 1 << 1,
     BAD   : 1 << 2,
     ENEMY : 1 << 3,
-    BULLET: 1 << 4
+    BULLET: 1 << 4,
+    DEAD  : 1 << 5
 };
 var deadzone = 0.1;
 var dead = (num, dual) => {
@@ -1972,7 +2196,86 @@ var dead = (num, dual) => {
             }
         }
         delete() {
-            this.dead = 1;
+            this.dead = 2;
+        }
+        hit(what) {
+            if(what.dead) return;
+            super.hit(what);
+        }
+        touchv2() {
+            var {touch, touch2} = this;
+            var mx = (this.x + this.s * .5 + game._x) * scale;
+            var my = (this.y + this.s * .5 + game._y) * scale;
+    
+            //var inBattle = enemies.filter(blob => !(blob instanceof Player)).length;
+    
+            if(touch && touch.end) touch = false;
+            if(!touch) touches.forEach(obj => {
+                if(obj.sx < innerWidth/2 && obj != touch2 && !obj.end) {
+                    touch = obj;
+                }
+            });
+            if(!touch2 && !this.skl) touches.forEach(obj => {
+                if(obj.sx > innerWidth/2 && obj != touch && !obj.end) {
+                    touch2 = obj;
+                }
+            });
+            if(touch) {
+                var mrad = atan(touch.my, touch.mx);
+                var dis = dist(touch.mx, touch.my);
+                var inside = dis > scale;
+                if(inside) {
+                    this.move(mrad);
+                    this.mrad = mrad;
+                }
+                this.touch = touch;
+                //if(inBattle && !Survival) 
+                touch.used = true;
+                ctx.strokeStyle = inside? this.color: this.color2;
+                ctx.beginPath();
+                ctx.lineWidth = scale * .125;
+                ctx.arc(touch.sx, touch.sy, scale, 0, PI2);
+                ctx.stroke();
+                ctx.lineWidth = scale * .125;
+                ctx.beginPath();
+                ctx.strokeStyle = this.color;
+                ctx.moveTo(touch.sx, touch.sy);
+                ctx.lineTo(touch.x, touch.y);
+                ctx.moveTo(mx, my);
+                ctx.lineTo(mx + touch.mx, my + touch.my);
+                ctx.stroke();
+            }
+            if(touch2) {
+                this.touch2 = touch2;
+                var hrad = atan(touch2.my, touch2.mx);
+                var dis = dist(touch2.mx, touch2.my);
+                var time = Date.now() - touch2.start;
+                var overdue = time > ms * 10;
+                var inside = dis > scale * 2;
+                if(time > ms * 3 || touch2.end) {
+                    if(inside) {
+                        this.skill(hrad);
+                    }else if(overdue || touch2.end) {
+                        this.ability(overdue? 3: 1, mrad, hrad);
+                    }
+                }
+                //if(inBattle)
+                touch2.used = true;
+                if(touch2.end) delete this.touch2;
+                ctx.lineWidth = scale * .125;
+                ctx.beginPath();
+                ctx.arc(touch2.sx, touch2.sy, scale * 2, 0, PI2);
+                ctx.strokeStyle = inside? this.color2: this.color;
+                ctx.stroke();
+                ctx.lineWidth = scale * .125;
+                ctx.beginPath();
+                ctx.strokeStyle = this.color2;
+                ctx.moveTo(touch2.sx, touch2.sy);
+                ctx.lineTo(touch2.x, touch2.y);
+                ctx.moveTo(mx, my);
+                ctx.lineTo(mx + touch2.x - touch2.sx, my + touch2.y - touch2.sy);
+                ctx.stroke();
+            }
         }
         spawn() {
             this.x = (game.w-this.s)*.5;
@@ -1991,8 +2294,13 @@ var dead = (num, dual) => {
         }
         tick()
         {
-            if(this.id == gamepads.length) this.keys();
-            else this.pad();
+            if(this.id == getExtras()) {
+                this.keys();
+                this.touchv2();
+            }else{
+                this.pad();
+                this.online();
+            }
             this.stats();
         }
         update(m, t) {
@@ -2051,6 +2359,26 @@ var dead = (num, dual) => {
                 else this.ab = 1;
                 this.ability(this.ab, dis? rad: dis, atan(y, x));
             }else this.ab = 0;
+        }
+        online() {
+            var len = gamepads.length;
+            if(this.id < len) return;
+            var arr = [...gamepads, ...online];
+            var obj = arr[this.id];
+            if(!obj) return;
+
+            var {spd, rad, srad, abil} = obj[1];
+            if(spd) {
+                if(spd > 1) spd = 1;
+                if(spd < 0) spd = 0;
+                this.move(rad, spd);
+            }
+            if(!isNaN(srad)) {
+                this.skill(srad);
+            }
+            if(abil) {
+                this.ability(abil, rad, srad);
+            }
         }
         revive() {
             this.dead = 0;
@@ -2216,9 +2544,8 @@ var dead = (num, dual) => {
             super.spawn(tiles);
         }
         mod() {
-            var mod = mains.length;
-            this.hp *= mod;
-            this.xhp *= mod;
+            this.lives = mains.length-1;
+            this.ml = mains.length;
         }
         color = "red";
         team = TEAM.ENEMY | TEAM.BAD;
@@ -2742,7 +3069,7 @@ var dead = (num, dual) => {
         hits = 0;
         wallInv = -1;
         shape = "square-horns";
-        coll = TEAM.GOOD | TEAM.BAD;
+        coll = TEAM.GOOD | TEAM.BAD | TEAM.DEAD;
         m = 20;
         constructor(target) {
             super();
@@ -3018,6 +3345,33 @@ var dead = (num, dual) => {
     }
 }
 {
+    var SurvivalGame = class extends Entity{
+        onSpawned() {
+            for(let blob of mains) {
+                blob.s = 0.3;
+                blob.spd *= 0.75;
+            }
+        }
+        time = 0;
+        tick() {
+            if(!this.spawned) return;
+            if(this.time % 100 == 0) {
+                this.summon(randomOf([Boss, TurretBoss, Chaser]));
+            }
+            ++this.time;
+        }
+        summon(cla) {
+            var blob = new cla();
+            blob.spawned = 1;
+            blob.s = 0.3;
+            blob.spd *= .75;
+            blob.hp = 1;
+            blob.xhp = 1;
+            blob.x = 0;
+            blob.y = 0;
+            enemies.push(blob);
+        }
+    }
     var Boss = class Boss extends Mover{
         nocoll = TEAM.BAD;
         hp = 10;
@@ -3119,7 +3473,6 @@ var dead = (num, dual) => {
         summon(cla) {
             if(!this.spawned) return;
             var blob = new cla();
-            blob.mod();
             blob.color = this.color;
             blob.color2 = this.color2;
             Bullet.position(blob, 0, this);
@@ -3278,7 +3631,7 @@ var dead = (num, dual) => {
             }
         }
     }
-    var tutorial = {
+    var world1 = {
         world: {
             tiles: "01000201c47008000000201c4700800100",
             spawn: [5, Wall, 5, Mover]
@@ -3373,7 +3726,7 @@ var dead = (num, dual) => {
             ctx.fillRect(.6, .1, .1, .1);
         };
         draw();
-        var test = {
+        var world2 = {
             world: {
                 tiles: "01000001fbf0140fabe0501fbf00000100",
                 spawn: [5, Turret, 5, Chaser]
@@ -3408,6 +3761,17 @@ var dead = (num, dual) => {
             }
         }
     }
+    function func(a) {return () => a};
+    var minigames = {
+        world: {},
+        levels: [{
+            spawn: [SurvivalGame],
+            tiles: "10702040088610000000400d8800100071"
+        }],
+        name: "Minigames",
+        color2: func("#111"),
+        color: func("#ccc")
+    }
     let pads = [];
     let PadTracker = class PadTracker{
         constructor(id) {
@@ -3440,14 +3804,16 @@ var dead = (num, dual) => {
             }
         }
     };
-    let worlds = [tutorial, test];
-    let selectedWorld = 1;
+    let worlds = [world1, world2, minigames];
+    let selectedWorld = 0;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;
     let dir;
     let mnu = 0;
+    var button = new Button;
     var worldSelect = function worldSelect() {
+        mains = [0];
         if(mnu == 1) {
             var lworld = loadedLevel;
             var sworld = selectedLevel;
@@ -3555,6 +3921,30 @@ var dead = (num, dual) => {
                 Right = true;
             }
         };
+        {
+            let wid = (game._x-1)*scale;
+            let x = wid * 0;
+            let h = wid * 1;
+            let y = (innerHeight-h)*.5;
+            button.resize(x, y, h, h);
+            button.draw();
+            Left ||= buttonClick(button);
+            x = innerWidth - h;
+            button.resize(x, y, h, h);
+            button.draw();
+            Right ||= buttonClick(button);
+            x = wid;
+            y = (game._y-1)*scale;
+            let w = (game.w+2)*scale;
+            h = (game.h+2)*scale;
+            button.resize(x, y, w, h);
+            button.draw();
+            let a = buttonClick(button);
+            if(a) canvas.requestFullscreen();
+            A_button ||= a;
+            button.resize(0, 0, game.width, game.height);
+            B_button ||= buttonClick(button);
+        }
         if(keys.use("ArrowRight") || Right) {
             if(mnu) selectedLevel = loop(sworld+1, wrlds.length);
             else selectedWorld = loop(sworld + 1, wrlds.length);
@@ -3563,7 +3953,7 @@ var dead = (num, dual) => {
         }
         if(keys.use("ArrowLeft") || Left) {
             if(mnu) selectedLevel = loop(sworld-1, wrlds.length);
-            else selectedWorld = loop(sworld + 1, wrlds.length);
+            else selectedWorld = loop(sworld - 1, wrlds.length);
             dir = -1;
             if(loader.delay) loader.load();
         }
@@ -3598,6 +3988,7 @@ var dead = (num, dual) => {
     worldSelect.spawn = function() {
         enemies = [];
         mains = [];
+        multi = 1;
         for(let i = 0; i <= multi; i++) {
             mains.push(new Gunner(i).spawn());
         }

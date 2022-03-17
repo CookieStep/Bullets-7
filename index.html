@@ -1,10 +1,248 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans&display=swap" rel="stylesheet">
-<script src="script.js"></script>
-<style>
-	body {
-		padding: 0;
-		margin: 0;
-	}
-</style>
+<script>
+window.creator = 1;
+// window.Enviroment = "Sololearn";
+// https://jummbus.bitbucket.io/#j4N07Unnamedn310s1k7l02e03t22m0afg0fj07i0r1O_U00000000o2230T0v0pL0OaD0Ou00q1d100f6y1z7C0w5c0h8X0T5v0fL0OaD0Ou21q1d500f6y1z8C0c0h8H_SJ5SJFAAAkAAAT1v0pL0OaD0Ou39q1d500f6y2z8C1c0h2A0F0B0V1Q38e0Pa610E0861R0000T2v0kL0OaD0Ou02q1d100fay0z1C1w0h0b4h4h0000000P8y8000000000000000000h4h0000000p23VFAuwCnUf8GpvBU3j8Z5cLQIzAGuiOuhOtdjdv8MACbEk4OfgEkNtewCnWChEu54Nt6xUij5Qq7BaBJdDg5jatbyf4WqCq-hyyoKxgj8Z2xjbZaAnQGc2qWpHWleBjFB-BjbUiDmdtcWvlF1ppQ-122Fx1FCnFRAO_jSIWWBrlbTHnFiBiOjFRuZWRbRXQFiE2suCnwCefBzzW9NZ41i8NoLGBWp602f95Z8LOx7Ay-AnVczOxBQifa4o0
+// https://jummbus.bitbucket.io/#j4N07Unnamedn310s1k3l00e0bt2mm0a7g0fj07i0r1O_U00000000o2110T5v0pL0OaD0Ou21q1d500f6y1z8C0c0h8H_SJ5SJFAAAkAAAT5v0zL0OaD0Ou42q1d100f6y1z7C1c0h0H_RBHBziiii9998T5v0pL0OaD0Ou51q1d500f7y1z6C1c0h0H-IHyiih9999998T4v0zL0OaD0Ouf0q1z6666ji8k8k3jSBKSJJAArriiiiii07JCABrzrrrrrrr00YrkqHrsrrrrjr005zrAqzrjzrrqr1jRjrqGGrrzsrsA099ijrABJJJIAzrrtirqrqjqixzsrAjrqjiqaqqysttAJqjikikrizrHtBJJAzArzrIsRCITKSS099ijrAJS____Qg99habbCAYrDzh00b4xci4N8j000002ck8Ng00000000000004h4h4h4h000p223IIRZ0ce15HkFoRXjdvmHiKmzeDqhHSmtfGNEQPFZ6d50kOfhAp2h8QSfi2jefR3nFAuxiGl2eBAPnVezhFFB-HG1HZDkER4PbR4OfijbZ6wFB-TW4M0ap69CnicKypt4OM0
+</script>
+<!-- Controllers/Keys/Mobile -->
+<script>
+function getExtras() {
+    return gamepads.length + online.size;
+}
+var deadzone = 0.1;
+var dead = (num, dual) => {
+    if(num < deadzone && (!dual || num > -deadzone)) return 0;
+    if(num > 1 - deadzone || (dual && num < deadzone - 1)) return sign(num);
+    return num / (1 - deadzone);
+}
+{
+    var keys = new (class Keys extends Map
+    {
+        hold(code)
+        {
+            return this.get(code) & 1
+                && this.set(code, 2);
+        }
+        use(code)
+        {
+            return this.get(code) == 1
+                && this.set(code, 2);
+        }
+        press(code)
+        {
+            this.has(code)?
+                this.set(code, 3):
+                this.set(code, 1);
+        }
+    });
+    onkeydown = ({code}) => keys.press(code);
+    onkeyup  = ({code}) => keys.delete(code);
+}
+{
+    class Pointer{
+        /**@param {Touch} touch*/
+        constructor(touch) {
+            this.id = touch.identifier;
+            this.sx = touch.pageX;
+            this.sy = touch.pageY;
+            this.x = this.sx;
+            this.y = this.sy;
+            this.up = false;
+            this.canceled = false;
+            this.used = false;
+            this.start = Date.now();
+        }
+        update(touch) {
+            this.x = touch.pageX;
+            this.y = touch.pageY;
+        }
+        get end() {
+            return this.up || this.canceled;
+        }
+        get mx() {
+            return this.x - this.sx;
+        }
+        get my() {
+            return this.y - this.sy;
+        }
+    }
+    var mobile;
+    var touches = new (class TouchMap extends Map {
+        /**@returns {Pointer}*/
+        get(id) {return super.get(id)}
+        /**@returns {IterableIterator<Pointer>}*/
+        get all() {return super.values()}
+        /**@returns {Pointer}*/
+        add(touch) {return super.set(touch.id, touch)}
+        /**@returns {Pointer}*/
+        find(test) {for(let touch of this.values())
+            if(test(touch)) return touch;
+        }
+    })();
+    /**@param {Touch} touch*/
+    let touchstart = function(touch) {
+        var pointer = new Pointer(touch);
+        touches.add(pointer);
+        //if(pointer.id) mobile = true;
+    };
+    /**@param {Touch} touch*/
+    let touchmove = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.update(touch);
+    };
+    /**@param {Touch} touch*/
+    let touchend = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.up = true;
+    };
+    /**@param {Touch} touch*/
+    let touchcancel = function(touch) {
+        var pointer = touches.get(touch.identifier);
+        pointer.canceled = true;
+    };
+    if("ontouchstart" in window) {
+        ontouchstart = e => [...e.changedTouches].forEach(touchstart);
+        ontouchmove = e => [...e.changedTouches].forEach(touchmove);
+        ontouchend = e => [...e.changedTouches].forEach(touchend);
+        ontouchcancel = (e) => [...e.changedTouches].forEach(touchcancel);
+        //onmousedown = e => !mobile && touchstart(e);
+        //onmousemove = e => !mobile && touches.has(undefined) && touchmove(e);
+        //onmouseup = e => !mobile && touchend(e);
+    }
+}
+{
+    var showButtons = 0;
+    var Button = class Button{
+        constructor(x, y, w, h) {
+            this.resize(x, y, w, h);
+        }
+        x = 0; y = 0;
+        w = 0; h = 0;
+        /**@param {Pointer} touch*/
+        includes(touch) {
+            return touch.x > this.x       &&
+                touch.y > this.y          &&
+                touch.x < this.x + this.w &&
+                touch.y < this.y + this.h;
+        }
+        resize(x, y, w, h) {
+            Object.assign(this, {x, y, w, h});
+        }
+        draw(color="red") {
+            if(!showButtons) return;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
+        }
+    }
+    /**@param {Button} button*/
+    var buttonClick = function buttonClick(button) {
+        for(let touch of touches.all) {
+            if(touch.up && !touch.used && button.includes(touch)) {
+                touch.used = true;
+                return true;
+            }
+        }
+    }
+}
+{
+    var gamepad;
+    var gamepads = [];
+    addEventListener("gamepadconnected", ({gamepad: {index}}) => {
+        gamepad = index;
+        gamepads.push(index);
+        multi = getExtras();
+        if(multi >= maxPlayers) {
+            multi = maxPlayers-1;
+        }
+    });
+    addEventListener("gamepaddisconnected", ({gamepad: {index}}) => {
+        gamepads = gamepads.filter(id => id != index);
+        multi = getExtras();
+        if(multi >= maxPlayers) {
+            multi = maxPlayers-1;
+        }
+    });
+}
+{
+    var ws;
+    var wsSetup = function wsSetup(link) {
+        try{
+        ws = new WebSocket("ws://"+link);
+        }catch(err) {
+            try{
+                ws = new WebSocket("wss://"+link);
+            }catch(err) {
+                return;
+            };
+        };
+        ws.open = new Promise(r=>ws.onopen = () => {
+            r();
+            console.log("Connected");
+            sendUpdate();
+        });
+        ws.onclose = err => {
+            console.error("err: "+err);
+            online.clear();
+            Host = 0;
+        }
+        ws.onmessage = (ev) => onData(JSON.parse(ev.data));
+    }
+    var online = new Map;
+    function onData(data) {
+        var {id} = data;
+        if(data.host) Host = data.host;
+
+        if(!("id" in data)) return;
+        if(data.input) {
+            online.set(id, data.input);
+            multi = getExtras();
+            if(multi >= maxPlayers) {
+                multi = maxPlayers-1;
+            }
+        }
+        if(data.close) {
+            online.delete(id);
+            multi = getExtras();
+            if(multi >= maxPlayers) {
+                multi = maxPlayers-1;
+            }
+        }
+        //sendUpdate();
+    }
+    var sendData = async function sendData(obj) {
+        await ws.open;
+        ws.send(JSON.stringify(obj));
+    }
+}
+</script>
+<!-- Hex-Binary -->
+<script>
+function hex(byte) {
+    var str = `${"0".repeat(4 - byte.length)}${byte}`;
+    var num = parseInt(str, 2);
+    return num.toString(16);
+}
+function binary(hex) {
+    var num = parseInt(hex, 16);
+    var byte = num.toString(2);
+    var str = `${"0".repeat(4 - byte.length)}${byte}`;
+    return str;
+}
+function Hex(binary) {
+    var str = `${binary}${"0".repeat((4 - (binary.length % 4)) % 4)}`;
+    var arr = [...str];
+    var str = '';
+    while(arr.length) {
+        var byte = arr.splice(0, 4);
+        str += hex(byte.join(""));
+    }
+    return str;
+}
+function Binary(hex) {
+    return [...hex].map(hex => binary(hex)).join("");
+}
+</script>

@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.20";
+const gameVersion = "0.0.21";
 const RUN_KEY = Symbol();
 
 var bullets = [];
@@ -23,135 +23,6 @@ var maxPlayers = 1;
 var expert;
 var Host;
 
-function getExtras() {
-    return gamepads.length + online.size;
-}
-{
-    class Pointer{
-        /**@param {Touch} touch*/
-        constructor(touch) {
-            this.id = touch.identifier;
-            this.sx = touch.pageX;
-            this.sy = touch.pageY;
-            this.x = this.sx;
-            this.y = this.sy;
-            this.up = false;
-            this.canceled = false;
-            this.used = false;
-            this.start = Date.now();
-        }
-        update(touch) {
-            this.x = touch.pageX;
-            this.y = touch.pageY;
-        }
-        get end() {
-            return this.up || this.canceled;
-        }
-        get mx() {
-            return this.x - this.sx;
-        }
-        get my() {
-            return this.y - this.sy;
-        }
-    }
-    var mobile;
-    var touches = new (class TouchMap extends Map {
-        /**@returns {Pointer}*/
-        get(id) {return super.get(id)}
-        /**@returns {IterableIterator<Pointer>}*/
-        get all() {return super.values()}
-        /**@returns {Pointer}*/
-        add(touch) {return super.set(touch.id, touch)}
-        /**@returns {Pointer}*/
-        find(test) {for(let touch of this.values())
-            if(test(touch)) return touch;
-        }
-    })();
-    /**@param {Touch} touch*/
-    let touchstart = function(touch) {
-        var pointer = new Pointer(touch);
-        touches.add(pointer);
-        //if(pointer.id) mobile = true;
-    };
-    /**@param {Touch} touch*/
-    let touchmove = function(touch) {
-        var pointer = touches.get(touch.identifier);
-        pointer.update(touch);
-    };
-    /**@param {Touch} touch*/
-    let touchend = function(touch) {
-        var pointer = touches.get(touch.identifier);
-        pointer.up = true;
-    };
-    /**@param {Touch} touch*/
-    let touchcancel = function(touch) {
-        var pointer = touches.get(touch.identifier);
-        pointer.canceled = true;
-    };
-    if("ontouchstart" in window) {
-        ontouchstart = e => [...e.changedTouches].forEach(touchstart);
-        ontouchmove = e => [...e.changedTouches].forEach(touchmove);
-        ontouchend = e => [...e.changedTouches].forEach(touchend);
-        ontouchcancel = (e) => [...e.changedTouches].forEach(touchcancel);
-        //onmousedown = e => !mobile && touchstart(e);
-        //onmousemove = e => !mobile && touches.has(undefined) && touchmove(e);
-        //onmouseup = e => !mobile && touchend(e);
-    }
-}
-{
-    var showButtons = 0;
-    var Button = class Button{
-        constructor(x, y, w, h) {
-            this.resize(x, y, w, h);
-        }
-        x = 0; y = 0;
-        w = 0; h = 0;
-        /**@param {Pointer} touch*/
-        includes(touch) {
-            return touch.x > this.x       &&
-                touch.y > this.y          &&
-                touch.x < this.x + this.w &&
-                touch.y < this.y + this.h;
-        }
-        resize(x, y, w, h) {
-            Object.assign(this, {x, y, w, h});
-        }
-        draw(color="red") {
-            if(!showButtons) return;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
-            ctx.strokeRect(this.x, this.y, this.w, this.h);
-        }
-    }
-    /**@param {Button} button*/
-    var buttonClick = function buttonClick(button) {
-        for(let touch of touches.all) {
-            if(touch.up && !touch.used && button.includes(touch)) {
-                touch.used = true;
-                return true;
-            }
-        }
-    }
-}
-{
-    var gamepad;
-    var gamepads = [];
-    addEventListener("gamepadconnected", ({gamepad: {index}}) => {
-        gamepad = index;
-        gamepads.push(index);
-        multi = getExtras();
-        if(multi >= maxPlayers) {
-            multi = maxPlayers-1;
-        }
-    });
-    addEventListener("gamepaddisconnected", ({gamepad: {index}}) => {
-        gamepads = gamepads.filter(id => id != index);
-        multi = getExtras();
-        if(multi >= maxPlayers) {
-            multi = maxPlayers-1;
-        }
-    });
-}
 {
     // let canv = document.createElement("canvas");
     // let octx = canv.getContext("2d");
@@ -200,57 +71,6 @@ function getExtras() {
         enemies: [],
         tiles: [],
         delay: 0
-    }
-}
-{
-    var ws;
-    var wsSetup = function wsSetup(link) {
-        try{
-        ws = new WebSocket("ws://"+link);
-        }catch(err) {
-            try{
-                ws = new WebSocket("wss://"+link);
-            }catch(err) {
-                return;
-            };
-        };
-        ws.open = new Promise(r=>ws.onopen = () => {
-            r();
-            console.log("Connected");
-            sendUpdate();
-        });
-        ws.onclose = err => {
-            console.error("err: "+err);
-            online.clear();
-            Host = 0;
-        }
-        ws.onmessage = (ev) => onData(JSON.parse(ev.data));
-    }
-    var online = new Map;
-    function onData(data) {
-        var {id} = data;
-        if(data.host) Host = data.host;
-
-        if(!("id" in data)) return;
-        if(data.input) {
-            online.set(id, data.input);
-            multi = getExtras();
-            if(multi >= maxPlayers) {
-                multi = maxPlayers-1;
-            }
-        }
-        if(data.close) {
-            online.delete(id);
-            multi = getExtras();
-            if(multi >= maxPlayers) {
-                multi = maxPlayers-1;
-            }
-        }
-        //sendUpdate();
-    }
-    var sendData = async function sendData(obj) {
-        await ws.open;
-        ws.send(JSON.stringify(obj));
     }
 }
 //menu.js
@@ -888,30 +708,6 @@ function getExtras() {
     // ontouchstart = (e) => [...e.changedTouches].forEach(touch => onmousedown(touch));
     // ontouchmove = (e) => [...e.changedTouches].forEach(touch => onmousemove(touch));
     // ontouchend = (e) => [...e.changedTouches].forEach(touch => onmouseup(touch));
-}
-//keys.js
-{
-    var keys = new (class Keys extends Map
-    {
-        hold(code)
-        {
-            return this.get(code) & 1
-                && this.set(code, 2);
-        }
-        use(code)
-        {
-            return this.get(code) == 1
-                && this.set(code, 2);
-        }
-        press(code)
-        {
-            this.has(code)?
-                this.set(code, 3):
-                this.set(code, 1);
-        }
-    });
-    onkeydown = ({code}) => keys.press(code);
-    onkeyup  = ({code}) => keys.delete(code);
 }
 var TIME = 0;
 //main.js
@@ -1563,30 +1359,6 @@ var TIME = 0;
         path.rotation = PI / 2;
     });
 }
-function hex(byte) {
-    var str = `${"0".repeat(4 - byte.length)}${byte}`;
-    var num = parseInt(str, 2);
-    return num.toString(16);
-}
-function binary(hex) {
-    var num = parseInt(hex, 16);
-    var byte = num.toString(2);
-    var str = `${"0".repeat(4 - byte.length)}${byte}`;
-    return str;
-}
-function Hex(binary) {
-    var str = `${binary}${"0".repeat((4 - (binary.length % 4)) % 4)}`;
-    var arr = [...str];
-    var str = '';
-    while(arr.length) {
-        var byte = arr.splice(0, 4);
-        str += hex(byte.join(""));
-    }
-    return str;
-}
-function Binary(hex) {
-    return [...hex].map(hex => binary(hex)).join("");
-}
 var bosses = new Set;
 //entity.js
 {
@@ -2174,12 +1946,6 @@ var TEAM = {
     BULLET: 1 << 4,
     DEAD  : 1 << 5
 };
-var deadzone = 0.1;
-var dead = (num, dual) => {
-    if(num < deadzone && (!dual || num > -deadzone)) return 0;
-    if(num > 1 - deadzone || (dual && num < deadzone - 1)) return sign(num);
-    return num / (1 - deadzone);
-}
 //player.js
 {
     var Player = class Player extends Entity
@@ -3988,7 +3754,6 @@ var dead = (num, dual) => {
     worldSelect.spawn = function() {
         enemies = [];
         mains = [];
-        multi = 1;
         for(let i = 0; i <= multi; i++) {
             mains.push(new Gunner(i).spawn());
         }

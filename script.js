@@ -1,5 +1,5 @@
 "use strict";
-const gameVersion = "0.0.21";
+const gameVersion = "0.0.21"; //ok
 const RUN_KEY = Symbol();
 
 var bullets = [];

@@ -1,12 +1,10 @@
 "use strict";
-const gameVersion = "0.0.21"; //ok
+const gameVersion = "0.0.24";
 const RUN_KEY = Symbol();
-
+var Enviroment = window.Enviroment;
+// https://jummbus.bitbucket.io/#j5N07Unnamedn310s1k0l00e0vt3sa7g0vj0dr1O_U00000000i0o434T0v0ru00f0000q0B1610Oa0d080w2h8E1b8T5v0pu21f0000q0B1610Oa0d080H_SJ5SJFAAAkAAAh8E1b8T0v0pu00f0000qwB17110Oa0d080wbh0E1b6T4v0kuf0f1a0q050Oa0z6666ji8k8k3jSBKSJJAArriiiiii07JCABrzrrrrrrr00YrkqHrsrrrrjr005zrAqzrjzrrqr1jRjrqGGrrzsrsA099ijrABJJJIAzrrtirqrqjqixzsrAjrqjiqaqqysttAJqjikikrizrHtBJJAzArzrIsRCITKSS099ijrAJS____Qg99habbCAYrDzh00E0b8jgxd24QlBsxedQQ8jUxd0004zgidx8Q4zoid18Q4zg01llld3kQdlll4x8i5zgR4h4h4h4h4h4h4h4h4h4h4gp28FFAu46nicKh8Wh7icLh6nhcKBiEAt8OZ8pt4OWle18WpBWwlcni8W0Ki5O97g5Ox7g8Wh7AODA54zwq9BQOewhQiezhQRczwq9BQOewhQ2eEhWwmGbgFyQhq5czE4t8zjbZfA0KP8W0Ki5O97g5Op7g8Wh6CTWq_xys82Q1sxN2zhwql5nbZzOf9hFB-wj8Z6wnQamiOl0R-i9yWoJ0n8r2zhFQGePaqpjduykQjyq9jhaul6nmcKKpt4OZ8pt4OWh7i8Wh6CTWaZBDB-w84bXjfbYA7aoLRgBwxvFjA8bZ4nt1vGNFgnw5cn3GkybgAGwJ0FEQF0mHlE2Qa50mxiG2QaJ0n91qMJkmCbgaqwJkmIkR1q0J0mCbg5G2QOfl4tczGAt4zE4t0zE6nF2eyhRieyhQOeyhQ3bQNBQjbF6nhcKCbH1qoJ8mGbgaqMJkmwbg5FyQ1q0Jomwkw5cz417g8W97h8W17k8W96Cny5ckg2Q1q0J0npp4mwbg5Omh5E2Q1o0mAbJuPka53aV6xAqt0LV9gEkcBAq6hFliY00
 var bullets = [];
 var enemies = [];
-
-var Enviroment = window.Enviroment;
-
 var lockToEdges = false;
 var cameraState = "";
 var zoomLevel = 2;
@@ -23,12 +21,243 @@ var maxPlayers = 1;
 var expert;
 var Host;
 
+
+//shapes.js
 {
-    // let canv = document.createElement("canvas");
-    // let octx = canv.getContext("2d");
+    var shapes = {};
+    /**@param {(ctx: Path2D) => void} path @returns {Path2D}*/
+    var shape = (name, path) =>
+    {
+        if(path)
+        {
+            var shape = new Path2D;
+            path(shape);
+            shapes[name] = shape;
+        }
+        else
+        {
+            return shapes[name];
+        }
+    };
+    shape("square", ctx => ctx.rect(0, 0, 1, 1));
+    shape("square-horns", ctx => {
+        var a = 0.3;
+        // ctx.rect(0, 0, 1-a, 1);
+        ctx.lineTo(1-a, 0);
+        ctx.lineTo(1, 0);
+        ctx.lineTo(1-a, a);
+        ctx.lineTo(1-a, 1-a);
+        ctx.lineTo(1, 1);
+        ctx.lineTo(1-a, 1);
+        ctx.lineTo(0, 1);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+    });
+    shape("pointer", path => {
+        var mid = 1/2;
+        var top = 2/10;
+        var btm = 8/10;
+        // var spl = 1/2;
+        var wid = 14/16;
+        // var spr = 11/16;
+        path.moveTo(mid, top);
+        path.lineTo(wid, btm);
+        // spr = 1 - spr;
+        wid = 1 - wid;
+        path.lineTo(wid, btm);
+        path.closePath();
+        path.rotation = PI / 2;
+    });
+    shape("square.3", ctx => {
+        var r = .3;
+        ctx.moveTo(r, 0);
+        ctx.lineTo(1 - r, 0);
+        ctx.quadraticCurveTo(1, 0, 1, 0 + r);
+        ctx.lineTo(1, 1 - r);
+        ctx.quadraticCurveTo(1, 1, 1 - r, 1);
+        ctx.lineTo(r, 1);
+        ctx.quadraticCurveTo(0, 1, 0, 1 - r);
+        ctx.lineTo(0, r);
+        ctx.quadraticCurveTo(0, 0, r, 0);
+    });
+    shape("square.4", ctx => {
+        var r = .4;
+        ctx.moveTo(r, 0);
+        ctx.lineTo(1 - r, 0);
+        ctx.quadraticCurveTo(1, 0, 1, 0 + r);
+        ctx.lineTo(1, 1 - r);
+        ctx.quadraticCurveTo(1, 1, 1 - r, 1);
+        ctx.lineTo(r, 1);
+        ctx.quadraticCurveTo(0, 1, 0, 1 - r);
+        ctx.lineTo(0, r);
+        ctx.quadraticCurveTo(0, 0, r, 0);
+    });
+    shape("arrow.2", path => {
+        //Top Triangle
+        path.moveTo(1 / 2, 1 / 8);
+        path.lineTo(3 / 4, 2 / 5);
+        path.lineTo(1 / 4, 2 / 5);
+        path.closePath();
+        //Bottom Triangle
+        path.moveTo(1 / 2, 4 / 8);
+        path.lineTo(3 / 4, 4 / 5);
+        path.lineTo(1 / 4, 4 / 5);
+        path.closePath();
+        path.rotation = PI / 2;
+    });
+    shape("link-hat", path => {
+        //Top Triangle
+        path.moveTo(.5, 1-2**.5/2);
+        path.lineTo(0, 1);
+        path.lineTo(1, 1);
+        path.closePath();
+    });
+}
+function zoom(x, y, l=1, w=1, r, {h, k}={})
+{
+    if(r != undefined)
+    {
+        if(!h)
+        {
+            h = x + l/2;
+            k = y + w/2;
+        }
+        var c = cos(r);
+        var s = sin(r);
+        this.setTransform(c * l, s * l, -s * w, c * w, h, k);
+        this.translate(-(h-x)/l, -(k-y)/w);
+    }
+    else
+    {
+        this.setTransform(l, 0, 0, w, x, y);
+    }
+};
+CanvasRenderingContext2D.prototype.zoom = zoom;
+var sprites = (() => {
+    var sheet = document.createElement("canvas");
+    var pen = sheet.getContext('2d');
+    var m = 4096;
+    sheet.width  = m;
+    sheet.height = m;
+
+    var s = 32;
+    var w = m/s;
+    var u = s/w;
+
+    var coords = i => {
+        var x = i % w;
+        return [x*s, (i - x)*u];
+    };
+    pen.fillStyle   = 'white';
+    pen.strokeStyle = 'white';
+    pen.lineWidth = 4/s;
+
+    var p = +2;
+    var o = -4;
+
+    var map = new Map;
+    var slots = new Array(w*w);
+    var len = slots.length;
+
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext('2d');
+    canvas.width  = s;
+    canvas.height = s;
+
+    var un = 32;
+
+    return {
+        sheet, pen, s,
+        canvas, ctx,
+        spriteMap: map,
+        grab(shp, st, fl, hp, Of, OFF) {
+            if(OFF.length == 0) OFF = [0, 0];
+            if(isNaN(hp)) hp = 1;
+            hp = round(hp*un);
+
+            Of = round(Of*un/PI2);
+            Of = (Of % un + un) % un;
+
+            for(var i = 0; i < len; i++) {
+                if(slots[i]) {
+                    let s = slots[i];
+                    let c = s.hp == hp && hp == 0;
+                    c ||= s.shp == shp &&
+                    s.st == st &&
+                    s.fl == fl &&
+                    s.hp == hp &&
+                    s.Of == Of &&
+                    s.OFF[0] == OFF[0] &&
+                    s.OFF[1] == OFF[1];
+                    if(c) {
+                        return slots[i].loc;
+                    }
+                }else break;
+            }
+            // console.log(shp, st, fl, hp);
+            if(i == len) {
+                i = 0;
+            }
+            var a = i+1;
+            if(a == len) {
+                a = 0;
+            }
+            if(slots[a]) {
+                let [x, y] = coords(a);
+                ctx.clearRect(x, y, s, s);
+                delete slots[a];
+            }
+            var [x, y] = coords(i);
+            var slot = {
+                color, shp, st, fl, hp, Of, OFF,
+                loc: [x+1, y+1, s-2, s-2]
+            };
+            Of *= PI2/un;
+
+            x += 1;
+            y += 1;
+            var S = s-2;
+            slots[i] = slot;
+            pen.zoom(x, y, S, S);
+
+            pen.save();
+            pen.beginPath();
+            pen.moveTo(.5+OFF[0], .5+OFF[1]);
+            pen.arc(.5+OFF[0], .5+OFF[1], 3, -Of, -Of + PI2 * hp/un);
+            pen.closePath();
+            pen.clip();
+            
+            if(fl) {
+                pen.fillStyle = fl;
+                pen.fill(shape(shp));
+            }
+            if(st) {
+                pen.zoom(x+p, y+p, S+o, S+o);
+                pen.strokeStyle = st;
+                pen.stroke(shape(shp));
+            }
+            pen.restore();
+            return slot.loc;
+        }
+    };
+})();
+function color(shape, color) {
+    var {sheet, canvas, ctx, spriteMap, s} = sprites;
+    var [x, y, w, h] = spriteMap.get(shape);
+    ctx.globalCompositeOperation = "copy";
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, s, s);
+
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(sheet, x, y, w, h, 0, 0, s, s);
+    return canvas;
+}
+
+{
     var loader = {
         load() {
             mapTiles = this.tiles;
+            game.updateBackground();
             game.expert = this.expert;
             if(worldSelect.active) enemies = [];
             for(let enemy of enemies) {
@@ -61,13 +290,12 @@ var Host;
             }else{
                 game.color = this.color;
                 game.color2 = this.color2;
+                game.updateBackground();
                 this.tiles = [];
                 this.enemies = [];
                 this.dir = 0;
             }
         },
-        // canvas: canv,
-        // ctx: octx,
         enemies: [],
         tiles: [],
         delay: 0
@@ -446,6 +674,43 @@ var Host;
     };
     lehmer.seed = floor(random() * 108340204802);
 
+    /**@type {zoom}*/
+    var ctxZoom = zoom.bind(ctx);
+    onresize = () =>
+    {
+        // game.length = min(innerHeight, innerWidth);
+        game.width = innerWidth;
+        game.height = innerHeight;
+        canvas.height = game.height;
+        canvas.width = game.width;
+        // loader.canvas.height = game.height;
+        // loader.canvas.width = game.width;
+
+        rescale();
+        game.updateBackground();
+
+        // game.w = game.width/scale;
+        // game.h = game.height/scale;
+        // game.l = mapSize;
+    };
+    var rescale = () => {
+        var scaleX = game.width/game.w;
+        var scaleY = game.height/game.h;
+        scale = min(scaleX, scaleY) * game.zoomL;
+    };
+    var mouse = {x: 0, y: 0, d: 0, s: 0};
+    oncontextmenu = (e) => (mouse.d = 2, onmousemove(e), e.preventDefault());
+    onmousedown = (e) => (mouse.d = 1, onmousemove(e));
+    onmouseup = (e) => (mouse.d = 0, onmousemove(e));
+    onmousemove = ({pageX: x, pageY: y}) => (mouse.x = x, mouse.y = y);
+    // ontouchstart = (e) => [...e.changedTouches].forEach(touch => onmousedown(touch));
+    // ontouchmove = (e) => [...e.changedTouches].forEach(touch => onmousemove(touch));
+    // ontouchend = (e) => [...e.changedTouches].forEach(touch => onmouseup(touch));
+}
+{//game.js
+    let background = document.createElement("canvas");
+    let bctx = background.getContext("2d");
+
     var game = {
         zoom(x, y, l=1, w=1, r, fx, fy, ctx) {
             ctx = ctx || this.ctx;
@@ -471,6 +736,151 @@ var Host;
             ctx = ctx || this.ctx;
             ctx.scale(scale, scale);
             ctx.translate(game._x, game._y);
+        },
+        background, bctx,
+        updateBackground() {
+            var ctx = bctx;
+            background.width = 64 * (game.w+2);
+            background.height = 64 * (game.h+2);
+
+            if(!this.color || !this.color2) return;
+            
+            ctx.resetTransform();
+            ctx.scale(64, 64);
+            ctx.translate(1, 1);
+            ctx.fillStyle = this.color2(game.w, game.h, scale/game.zoomL);
+            ctx.fillRect(0, 0, game.w, game.h);
+            ctx.fillStyle = this.color(game.w, game.h, scale/game.zoomL);
+            var drawTile = function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
+                function edge(x, y) {
+                    if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
+                        return !((x < -1 || x > game.w) || (y < -1 || y > game.h))
+                    }
+                }
+                var res = [];
+                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                {
+                    dx = floor(dx + x);
+                    dy = floor(dy + y);
+                    if(edge(dx, dy)) res.push(1);
+                    else if(outOfBounds(dx, dy)) res.push(0);
+                    else if(tiles[Index(dx, dy)]) res.push(1);
+                    else res.push(0);
+                }
+                var [t, b, l, r, tl, bl, tr, br] = res;
+
+                var m = 0.02;
+                var o = .3;
+                x = x - m;
+                y = y - m;
+                var a = x + o;
+                var g = x + 1 - o;
+                var c = x + 1 + m;
+                var d = y + o;
+                var e = y + 1 - o;
+                var f = y + 1 + m;
+                ctx.beginPath();
+                ctx.moveTo(a, y);
+                if(t || r || tr) {
+                    ctx.lineTo(c, y);
+                }else{
+                    ctx.lineTo(g, y);
+                    ctx.quadraticCurveTo(c, y, c, d);
+                }
+                if(b || r || br) {
+                    ctx.lineTo(c, f);
+                }else{
+                    ctx.lineTo(c, e);
+                    ctx.quadraticCurveTo(c, f, g, f);
+                }
+                if(b || l || bl) {
+                    ctx.lineTo(x, f)
+                }else{
+                    ctx.lineTo(a, f);
+                    ctx.quadraticCurveTo(x, f, x, e);
+                }
+                if(t || l || tl) {
+                    ctx.lineTo(x, y);
+                }else{
+                    ctx.lineTo(x, d);
+                    ctx.quadraticCurveTo(x, y, a, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+            };
+            var drawSpace = function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
+                function edge(x, y) {
+                    return (x == -1 || x == game.w) || (y == -1 || y == game.h);
+                }
+                if(edge(x, y)) return;
+                var res = [];
+                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                {
+                    dx += x;
+                    dy += y;
+                    if(edge(dx, dy)) res.push(1);
+                    else if(outOfBounds(dx, dy)) res.push(0);
+                    else if(tiles[Index(dx, dy)]) res.push(1);
+                    else res.push(0);
+                }
+                var [t, b, l, r] = res;
+
+                if(!(t || b || l || r)) return;
+
+                var m = 0.01;
+                x = x - m;
+                y = y - m
+                var o = .5;
+                var a = x + o;
+                var g = x + 1 - o;
+                var c = x + 1 + m;
+                var d = y + o;
+                var e = y + 1 - o;
+                var f = y + 1 + m;
+                ctx.beginPath();
+                if(t && r) {
+                    ctx.moveTo(a, y);
+                    ctx.lineTo(g, y);
+                    ctx.quadraticCurveTo(c, y, c, d);
+                    ctx.lineTo(c, y);
+                    var dr = true;
+                }
+                if(b && r) {
+                    ctx.moveTo(c, y);
+                    ctx.lineTo(c, e);
+                    ctx.quadraticCurveTo(c, f, g, f);
+                    ctx.lineTo(c, f);
+                    var dr = true;
+                }
+                if(b && l) {
+                    ctx.moveTo(c, f);
+                    ctx.lineTo(a, f);
+                    ctx.quadraticCurveTo(x, f, x, e);
+                    ctx.lineTo(x, f);
+                    var dr = true;
+                }
+                if(t && l) {
+                    ctx.moveTo(x, f);
+                    ctx.lineTo(x, d);
+                    ctx.quadraticCurveTo(x, y, a, y);
+                    ctx.lineTo(x, y);
+                    var dr = true;
+                }
+                if(dr) {
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            };
+            for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
+            {
+                let i = Index(x, y);
+                if(mapTiles[i] || outOfBounds(x, y)) {
+                    drawTile(x, y, mapTiles, ctx);
+                }else{
+                    drawSpace(x, y, mapTiles, ctx);
+                }
+            }
+
         },
         get zw() {return this.w/this.zoomL},
         get zh() {return this.h/this.zoomL},
@@ -574,9 +984,24 @@ var Host;
                     game.y = (game.zh - (innerHeight * s)) * -.5;
 
                     // var player = enemies[0];
-                    s = player.s * .5;
-                    game.x += game.zw * .5 - player.x - s;
-                    game.y += game.zh * .5 - player.y - s;
+                    let px = 0;
+                    let py = 0;
+                    let ps = 0;
+
+                    for(let blob of mains) {
+                        px += blob.x;
+                        py += blob.y;
+                        ps += blob.s;
+                    }
+                    
+                    ps *= .5;
+                    ps /= mains.length;
+                    px /= mains.length;
+                    py /= mains.length;
+
+                    s = ps * .5;
+                    game.x += game.zw * .5 - px - s;
+                    game.y += game.zh * .5 - py - s;
 
                     let {x, y} = mouse;
                     x -= innerWidth/2;
@@ -587,7 +1012,7 @@ var Host;
                     game.y -= y;
                 }
                 if(cameraState == "auto") {
-                    let arr = [...enemies, ...loader.enemies].filter(blob => !(blob.remove || (blob.team & TEAM.BULLET)));
+                    let arr = enemies.filter(blob => !(blob.remove || (blob.team & TEAM.BULLET)));
                     let p = 1;
                     if(loader.delay > 1 || !arr.length) {
                         minX = -p;
@@ -656,58 +1081,6 @@ var Host;
         _step: 0.1,
         stepM: 1
     };
-
-    function zoom(x, y, l=1, w=1, r, {h, k}={})
-    {
-        if(r != undefined)
-        {
-            if(!h)
-            {
-                h = x + l/2;
-                k = y + w/2;
-            }
-            var c = cos(r);
-            var s = sin(r);
-            this.setTransform(c * l, s * l, -s * w, c * w, h, k);
-            this.translate(-(h-x)/l, -(k-y)/w);
-        }
-        else
-        {
-            this.setTransform(l, 0, 0, w, x, y);
-        }
-    };
-    CanvasRenderingContext2D.prototype.zoom = zoom;
-    /**@type {zoom}*/
-    var ctxZoom = zoom.bind(ctx);
-    onresize = () =>
-    {
-        // game.length = min(innerHeight, innerWidth);
-        game.width = innerWidth;
-        game.height = innerHeight;
-        canvas.height = game.height;
-        canvas.width = game.width;
-        // loader.canvas.height = game.height;
-        // loader.canvas.width = game.width;
-
-        rescale();
-
-        // game.w = game.width/scale;
-        // game.h = game.height/scale;
-        // game.l = mapSize;
-    };
-    var rescale = () => {
-        var scaleX = game.width/game.w;
-        var scaleY = game.height/game.h;
-        scale = min(scaleX, scaleY) * game.zoomL;
-    };
-    var mouse = {x: 0, y: 0, d: 0, s: 0};
-    oncontextmenu = (e) => (mouse.d = 2, onmousemove(e), e.preventDefault());
-    onmousedown = (e) => (mouse.d = 1, onmousemove(e));
-    onmouseup = (e) => (mouse.d = 0, onmousemove(e));
-    onmousemove = ({pageX: x, pageY: y}) => (mouse.x = x, mouse.y = y);
-    // ontouchstart = (e) => [...e.changedTouches].forEach(touch => onmousedown(touch));
-    // ontouchmove = (e) => [...e.changedTouches].forEach(touch => onmousemove(touch));
-    // ontouchend = (e) => [...e.changedTouches].forEach(touch => onmouseup(touch));
 }
 var TIME = 0;
 //main.js
@@ -860,7 +1233,7 @@ var TIME = 0;
         }catch(err) {console.error(err)}
         main();
     }
-    var ms = 1000/40;
+    var ms = 1000/50;
     var nextFrame = () => {
         setTimeout(() => {
             if(gone) {
@@ -902,6 +1275,7 @@ var TIME = 0;
                         if(mouse.d == 1 && edit)
                         {
                             mapTiles[i] = +!mapTiles[i];
+                            game.updateBackground();
                             // console.log(mapTiles);
                         }
                         else if(mouse.d == 2)
@@ -959,7 +1333,7 @@ var TIME = 0;
             if(keys.use("Space") || X_button) {
                 var allDead = true;
                 for(let blob of mains) {
-                    if(!blob.dead) {
+                    if(!(blob.dead || blob.remove)) {
                         allDead = false;
                         break;
                     }
@@ -967,6 +1341,7 @@ var TIME = 0;
                 if(allDead) {
                     --level;
                     mapTiles = [];
+                    game.updateBackground();
                     loader.enemies = [];
                     loader.tiles = [];
                     loader.load();
@@ -986,151 +1361,157 @@ var TIME = 0;
                 game._x -= game.w * 2 * loader.dir * (1 - (loader.delay)/loader.time);
                 alpha = 1;
             }
-            game.scale();
-            ctx.fillStyle = game.color2(game.w, game.h, scale/game.zoomL);
-            ctx.fillRect(0, 0, game.w, game.h);
-            ctx.fillStyle = game.color(game.w, game.h, scale/game.zoomL);
-            var drawTile = function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
-                function edge(x, y) {
-                    if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
-                        return !((x < -1 || x > game.w) || (y < -1 || y > game.h))
+            {
+                // game.scale();
+                // ctx.fillStyle = game.color2(game.w, game.h, scale/game.zoomL);
+                // ctx.fillRect(0, 0, game.w, game.h);
+                // ctx.fillStyle = game.color(game.w, game.h, scale/game.zoomL);
+                var drawTile = function drawTile(x, y, tiles=mapTiles, ctx=game.ctx) {
+                    function edge(x, y) {
+                        if((x == -1 || x == game.w) || (y == -1 || y == game.h)) {
+                            return !((x < -1 || x > game.w) || (y < -1 || y > game.h))
+                        }
                     }
-                }
-                var res = [];
-                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
-                {
-                    dx = floor(dx + x);
-                    dy = floor(dy + y);
-                    if(edge(dx, dy)) res.push(1);
-                    else if(outOfBounds(dx, dy)) res.push(0);
-                    else if(tiles[Index(dx, dy)]) res.push(1);
-                    else res.push(0);
-                }
-                var [t, b, l, r, tl, bl, tr, br] = res;
+                    var res = [];
+                    for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                    {
+                        dx = floor(dx + x);
+                        dy = floor(dy + y);
+                        if(edge(dx, dy)) res.push(1);
+                        else if(outOfBounds(dx, dy)) res.push(0);
+                        else if(tiles[Index(dx, dy)]) res.push(1);
+                        else res.push(0);
+                    }
+                    var [t, b, l, r, tl, bl, tr, br] = res;
 
-                var m = 0.02;
-                var o = .3;
-                x = x - m;
-                y = y - m;
-                var a = x + o;
-                var g = x + 1 - o;
-                var c = x + 1 + m;
-                var d = y + o;
-                var e = y + 1 - o;
-                var f = y + 1 + m;
-                ctx.beginPath();
-                ctx.moveTo(a, y);
-                if(t || r || tr) {
-                    ctx.lineTo(c, y);
-                }else{
-                    ctx.lineTo(g, y);
-                    ctx.quadraticCurveTo(c, y, c, d);
-                }
-                if(b || r || br) {
-                    ctx.lineTo(c, f);
-                }else{
-                    ctx.lineTo(c, e);
-                    ctx.quadraticCurveTo(c, f, g, f);
-                }
-                if(b || l || bl) {
-                    ctx.lineTo(x, f)
-                }else{
-                    ctx.lineTo(a, f);
-                    ctx.quadraticCurveTo(x, f, x, e);
-                }
-                if(t || l || tl) {
-                    ctx.lineTo(x, y);
-                }else{
-                    ctx.lineTo(x, d);
-                    ctx.quadraticCurveTo(x, y, a, y);
-                }
-                ctx.closePath();
-                ctx.fill();
-            };
-            var drawSpace = function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
-                function edge(x, y) {
-                    return (x == -1 || x == game.w) || (y == -1 || y == game.h);
-                }
-                if(edge(x, y)) return;
-                var res = [];
-                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
-                {
-                    dx += x;
-                    dy += y;
-                    if(edge(dx, dy)) res.push(1);
-                    else if(outOfBounds(dx, dy)) res.push(0);
-                    else if(tiles[Index(dx, dy)]) res.push(1);
-                    else res.push(0);
-                }
-                var [t, b, l, r] = res;
-
-                if(!(t || b || l || r)) return;
-
-                var m = 0.01;
-                x = x - m;
-                y = y - m
-                var o = .5;
-                var a = x + o;
-                var g = x + 1 - o;
-                var c = x + 1 + m;
-                var d = y + o;
-                var e = y + 1 - o;
-                var f = y + 1 + m;
-                ctx.beginPath();
-                if(t && r) {
+                    var m = 0.02;
+                    var o = .3;
+                    x = x - m;
+                    y = y - m;
+                    var a = x + o;
+                    var g = x + 1 - o;
+                    var c = x + 1 + m;
+                    var d = y + o;
+                    var e = y + 1 - o;
+                    var f = y + 1 + m;
+                    ctx.beginPath();
                     ctx.moveTo(a, y);
-                    ctx.lineTo(g, y);
-                    ctx.quadraticCurveTo(c, y, c, d);
-                    ctx.lineTo(c, y);
-                    var dr = true;
-                }
-                if(b && r) {
-                    ctx.moveTo(c, y);
-                    ctx.lineTo(c, e);
-                    ctx.quadraticCurveTo(c, f, g, f);
-                    ctx.lineTo(c, f);
-                    var dr = true;
-                }
-                if(b && l) {
-                    ctx.moveTo(c, f);
-                    ctx.lineTo(a, f);
-                    ctx.quadraticCurveTo(x, f, x, e);
-                    ctx.lineTo(x, f);
-                    var dr = true;
-                }
-                if(t && l) {
-                    ctx.moveTo(x, f);
-                    ctx.lineTo(x, d);
-                    ctx.quadraticCurveTo(x, y, a, y);
-                    ctx.lineTo(x, y);
-                    var dr = true;
-                }
-                if(dr) {
+                    if(t || r || tr) {
+                        ctx.lineTo(c, y);
+                    }else{
+                        ctx.lineTo(g, y);
+                        ctx.quadraticCurveTo(c, y, c, d);
+                    }
+                    if(b || r || br) {
+                        ctx.lineTo(c, f);
+                    }else{
+                        ctx.lineTo(c, e);
+                        ctx.quadraticCurveTo(c, f, g, f);
+                    }
+                    if(b || l || bl) {
+                        ctx.lineTo(x, f)
+                    }else{
+                        ctx.lineTo(a, f);
+                        ctx.quadraticCurveTo(x, f, x, e);
+                    }
+                    if(t || l || tl) {
+                        ctx.lineTo(x, y);
+                    }else{
+                        ctx.lineTo(x, d);
+                        ctx.quadraticCurveTo(x, y, a, y);
+                    }
                     ctx.closePath();
                     ctx.fill();
-                }
-            };
-            for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
-            {
-                let i = Index(x, y);
-                if(loader.delay) {
-                    if(mapTiles[i] || outOfBounds(x, y)) {
-                        ctx.fillRect(x, y, 1, 1);
+                };
+                var drawSpace = function drawSpace(x, y, tiles=mapTiles, ctx=game.ctx) {
+                    function edge(x, y) {
+                        return (x == -1 || x == game.w) || (y == -1 || y == game.h);
                     }
-                }else{
-                    if(mapTiles[i] || outOfBounds(x, y)) {
-                        drawTile(x, y);
-                    }else{
-                        drawSpace(x, y);
+                    if(edge(x, y)) return;
+                    var res = [];
+                    for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+                    {
+                        dx += x;
+                        dy += y;
+                        if(edge(dx, dy)) res.push(1);
+                        else if(outOfBounds(dx, dy)) res.push(0);
+                        else if(tiles[Index(dx, dy)]) res.push(1);
+                        else res.push(0);
                     }
-                }
+                    var [t, b, l, r] = res;
+
+                    if(!(t || b || l || r)) return;
+
+                    var m = 0.01;
+                    x = x - m;
+                    y = y - m
+                    var o = .5;
+                    var a = x + o;
+                    var g = x + 1 - o;
+                    var c = x + 1 + m;
+                    var d = y + o;
+                    var e = y + 1 - o;
+                    var f = y + 1 + m;
+                    ctx.beginPath();
+                    if(t && r) {
+                        ctx.moveTo(a, y);
+                        ctx.lineTo(g, y);
+                        ctx.quadraticCurveTo(c, y, c, d);
+                        ctx.lineTo(c, y);
+                        var dr = true;
+                    }
+                    if(b && r) {
+                        ctx.moveTo(c, y);
+                        ctx.lineTo(c, e);
+                        ctx.quadraticCurveTo(c, f, g, f);
+                        ctx.lineTo(c, f);
+                        var dr = true;
+                    }
+                    if(b && l) {
+                        ctx.moveTo(c, f);
+                        ctx.lineTo(a, f);
+                        ctx.quadraticCurveTo(x, f, x, e);
+                        ctx.lineTo(x, f);
+                        var dr = true;
+                    }
+                    if(t && l) {
+                        ctx.moveTo(x, f);
+                        ctx.lineTo(x, d);
+                        ctx.quadraticCurveTo(x, y, a, y);
+                        ctx.lineTo(x, y);
+                        var dr = true;
+                    }
+                    if(dr) {
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                };
+                // for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
+                // {
+                //     let i = Index(x, y);
+                //     if(loader.delay) {
+                //         if(mapTiles[i] || outOfBounds(x, y)) {
+                //             ctx.fillRect(x, y, 1, 1);
+                //         }
+                //     }else{
+                //         if(mapTiles[i] || outOfBounds(x, y)) {
+                //             drawTile(x, y);
+                //         }else{
+                //             drawSpace(x, y);
+                //         }
+                //     }
+                // }
+                game.scale();
+                ctx.drawImage(game.background, -1, -1, game.w+2, game.h+2);
             }
+            game.scale();
             if(worldSelect.active) for(let blob of enemies) {
                 blob.draw();
             }
             game._x = gx;
         }
         ctx.resetTransform();
+        var ENEMIES_ALIVE = 0;
 
 
         if(loader.delay) {
@@ -1148,12 +1529,14 @@ var TIME = 0;
             if(loader.dir) {
                 game._x += game.w * 2 * loader.dir * (loader.delay)/loader.time;
                 alpha = 1;
+                game.scale();
+                octx.fillStyle = loader.color2(game.w, game.h, scale/game.zoomL);
+                octx.fillRect(0, 0, game.w, game.h);
+            }else{
+                game.scale();
             }
             octx.globalAlpha = alpha;
-            game.scale();
             // game.scale(octx);
-            octx.fillStyle = loader.color2(game.w, game.h, scale/game.zoomL);
-            octx.fillRect(0, 0, game.w, game.h);
             octx.fillStyle = loader.color(game.w, game.h, scale/game.zoomL);
             for(let x = -1; x <= game.w; x++) for(let y = -1; y <= game.h; y++)
             {
@@ -1173,6 +1556,7 @@ var TIME = 0;
             --loader.delay;
             if(loader.delay == 50) {
                 mapTiles = [];
+                game.updateBackground();
             }
             if(loader.delay == 0) {
                 loader.load();
@@ -1180,8 +1564,6 @@ var TIME = 0;
             // ctx.globalAlpha = alpha;
             // ctx.drawImage(loader.canvas, 0, 0);
             ctx.globalAlpha = 1;
-        }else if(enemies.filter(blob => blob.team & TEAM.BAD).length == 0) {
-            startLevel();
         }
 
         ctx.resetTransform();
@@ -1190,25 +1572,29 @@ var TIME = 0;
         {
             let blob = enemies[i];
             blob.step();
-            if(blob.dead) continue;
+            if(blob.team & TEAM.BAD) ++ENEMIES_ALIVE;
+            if(blob.dead || blob.remove) continue;
             for(let j = 0; j < i; j++)
             {
                 let them = enemies[j];
-                if(them.dead) continue;
+                if(them.dead || blob.remove) continue;
                 blob.register(them);
                 them.register(blob);
             }
+        }
+        if(!(worldSelect.active || loader.delay || ENEMIES_ALIVE)) {
+            startLevel();
         }
         for(let a = 0; a < game.steps; a++) {
             for(let i = 0, e = enemies.length; i < e; i++)
             {
                 let blob = enemies[i];
+                if(blob.remove) continue;
                 blob.update(blob.stepf);
                 for(let j = 0; j < i; j++)
                 {
                     let them = enemies[j];
-                    blob.register(them);
-                    them.register(blob);
+                    if(them.remove) continue;
                     if(Entity.isTouching(blob, them))
                     {
                         if(blob instanceof Test && them instanceof Test) {
@@ -1236,7 +1622,7 @@ var TIME = 0;
                 blob.undo = false;
             }
         }
-        {
+        {//boss bar
             let i = 0;
             bosses.forEach(blob => {
                 var l = 5;
@@ -1268,209 +1654,40 @@ var TIME = 0;
             blob.draw();
         }
         ctx.resetTransform();
-        enemies = enemies.filter(blob => !blob.remove);
+        enemies = enemies.filter(b => !b.remove);
+
         // ctx.strokeStyle = "red";
         // ctx.lineWidth = 1;
         // ctx.strokeRect(0, 0, innerWidth/2, innerHeight/2);
         if(Host) sendData({frame: 1});
     }
 }
-//shapes.js
-{
-    var shapes = {};
-    /**@param {(ctx: Path2D) => void} path @returns {Path2D}*/
-    var shape = (name, path) =>
-    {
-        if(path)
-        {
-            var shape = new Path2D;
-            path(shape);
-            shapes[name] = shape;
-        }
-        else
-        {
-            return shapes[name];
-        }
-    };
-    shape("square", ctx => ctx.rect(0, 0, 1, 1));
-    shape("square-horns", ctx => {
-        var a = 0.3;
-        // ctx.rect(0, 0, 1-a, 1);
-        ctx.lineTo(1-a, 0);
-        ctx.lineTo(1, 0);
-        ctx.lineTo(1-a, a);
-        ctx.lineTo(1-a, 1-a);
-        ctx.lineTo(1, 1);
-        ctx.lineTo(1-a, 1);
-        ctx.lineTo(0, 1);
-        ctx.lineTo(0, 0);
-        ctx.closePath();
-    });
-    shape("pointer", path => {
-        var mid = 1/2;
-        var top = 2/10;
-        var btm = 8/10;
-        // var spl = 1/2;
-        var wid = 14/16;
-        // var spr = 11/16;
-        path.moveTo(mid, top);
-        path.lineTo(wid, btm);
-        // spr = 1 - spr;
-        wid = 1 - wid;
-        path.lineTo(wid, btm);
-        path.closePath();
-        path.rotation = PI / 2;
-    });
-    shape("square.3", ctx => {
-        var r = .3;
-        ctx.moveTo(r, 0);
-        ctx.lineTo(1 - r, 0);
-        ctx.quadraticCurveTo(1, 0, 1, 0 + r);
-        ctx.lineTo(1, 1 - r);
-        ctx.quadraticCurveTo(1, 1, 1 - r, 1);
-        ctx.lineTo(r, 1);
-        ctx.quadraticCurveTo(0, 1, 0, 1 - r);
-        ctx.lineTo(0, r);
-        ctx.quadraticCurveTo(0, 0, r, 0);
-    });
-    shape("square.4", ctx => {
-        var r = .4;
-        ctx.moveTo(r, 0);
-        ctx.lineTo(1 - r, 0);
-        ctx.quadraticCurveTo(1, 0, 1, 0 + r);
-        ctx.lineTo(1, 1 - r);
-        ctx.quadraticCurveTo(1, 1, 1 - r, 1);
-        ctx.lineTo(r, 1);
-        ctx.quadraticCurveTo(0, 1, 0, 1 - r);
-        ctx.lineTo(0, r);
-        ctx.quadraticCurveTo(0, 0, r, 0);
-    });
-    shape("arrow.2", path => {
-        //Top Triangle
-        path.moveTo(1 / 2, 1 / 8);
-        path.lineTo(3 / 4, 2 / 5);
-        path.lineTo(1 / 4, 2 / 5);
-        path.closePath();
-        //Bottom Triangle
-        path.moveTo(1 / 2, 4 / 8);
-        path.lineTo(3 / 4, 4 / 5);
-        path.lineTo(1 / 4, 4 / 5);
-        path.closePath();
-        path.rotation = PI / 2;
-    });
-}
 var bosses = new Set;
-//entity.js
-{
+var drawImps = ["pen", "drawLine"];
+{//entity.js
     var Entity = class Entity
     {
         register(enemy) {}
+        isPlayer(what) {
+            return (what.team & this.hits) && !(what.team & TEAM.BULLET);
+        }
         onCollide() {}
         onSpawned() {}
-        clipSight() {
-            let rads = [];
-            let dis = 50;
-            let s = this.s * .5;
-            let mx = this.x + s;
-            let my = this.y + s;
-            var point = {x: 0, y: 0, s: 0};
-            game.scale();
-            ctx.beginPath();
-            for(let x = 0; x < game.w; x++) for(let y = 0; y < game.h; y++)
-            {
-                let i = Index(x, y);
-                if(!mapTiles[i]) continue;
-                
-                let res = [];
-                for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
-                {
-                    dx += x;
-                    dy += y;
-                    if(outOfBounds(dx, dy)) res.push(0);
-                    else if(mapTiles[Index(dx, dy)]) res.push(1);
-                    else res.push(0);
-                }
-                var point = {x, y, s: 0};
-                var [t, b, l, r, tl, bl, tr, br] = res;
-
-                if((!t && !l) || (t && l && !tl)) {
-                    let rad = Entity.radian(this, point);
-                    // rads.push(rad);
-                    ctx.moveTo(point.x, point.y);
-                    ctx.arc(point.x, point.y, .1, 0, PI2);
-                    rads.push(rad + 0.0001);
-                    rads.push(rad - 0.0001);
-                }
-                point.x += 1;
-                if((!t && !r) || (t && r && !tr)) {
-                    let rad = Entity.radian(this, point);
-                    // rads.push(rad);
-                    ctx.moveTo(point.x, point.y);
-                    ctx.arc(point.x, point.y, .1, 0, PI2);
-                    rads.push(rad + 0.0001);
-                    rads.push(rad - 0.0001);
-                }
-                point.y += 1;
-                if((!b && !r) || (b && r && !br)) {
-                    let rad = Entity.radian(this, point);
-                    // rads.push(rad);
-                    ctx.moveTo(point.x, point.y);
-                    ctx.arc(point.x, point.y, .1, 0, PI2);
-                    rads.push(rad + 0.0001);
-                    rads.push(rad - 0.0001);
-                }
-                point.x -= 1;
-                if((!b && !l) || (b && l && !bl)) {
-                    let rad = Entity.radian(this, point);
-                    // rads.push(rad);
-                    ctx.moveTo(point.x, point.y);
-                    ctx.arc(point.x, point.y, .1, 0, PI2);
-                    rads.push(rad + 0.0001);
-                    rads.push(rad - 0.0001);
-                }
-            }
-            ctx.fillStyle = "red";
-            // ctx.fill();
-
-            let first = 0;
-            for(let [x, y] of [[0, 0], [0, game.h], [game.w, game.h], [game.w, 0]])
-            {
-                point.x = x; point.y = y;
-                rads.push(Entity.radian(this, point));
-            }
-            rads = [...(new Set(rads))];
-            rads = rads.sort((a, b) => a - b);
-            // rads = new Set(rads);
-            ctx.resetTransform();
-            ctx.fillText(rads.length, 2, 10);
-            game.scale();
-            ctx.beginPath();
-            for(let rad of rads) {
-                let c = cos(rad);
-                let s = sin(rad);
-                let d = Test.lineCheck(mx, my, mx + c * dis, my + s * dis, true);
-                if(!d) d = dis;
-                if(first) 
-                {
-                    ctx.moveTo(mx + c * d, my + s * d);
-                    first = false;
-                }
-                else ctx.lineTo(mx + c * d, my + s * d);
-                // ctx.moveTo(mx, my);
-                // ctx.lineTo(mx + c * d, my + s * d);
-                // ctx.arc(mx + c * d, my + s * d, .1, 0, PI2)
-            }
-            // var color = ctx.createRadialGradient(mx, my, 0, mx, my, 15);
-            // color.addColorStop(0, "#fffa");
-            // color.addColorStop(1, "#0000");
-            ctx.fillStyle = "#fff2";
-            ctx.fill();
-            ctx.resetTransform();
-        }
         drawWith(ctx, obj) {
-            obj = {...this, ...obj};
-            obj.pen = this.pen;
-            this.draw.call(obj, ctx);
+            // obj = {...this, ...obj};
+            // for(let prop of drawImps) {
+            //     obj[prop] = this[prop];
+            // }
+            // this.draw.call(obj, ctx);
+            var old = {};
+            for(let prop in obj) {
+                old[prop] = this[prop];
+                this[prop] = obj[prop];
+            }
+            this.draw(ctx);
+            for(let prop in old) {
+                this[prop] = old[prop];
+            }
         }
         spawn(tiles=mapTiles)
         {
@@ -1491,7 +1708,10 @@ var bosses = new Set;
             this.vx *= this.f;
             this.vy *= this.f;
             if(!this.dead) this.tick?.(tiles);
-            if(this.dead) ++this.dead;
+            if(this.dead) {
+                if(worldSelect.active) this.dead += 0.1;
+                else ++this.dead;
+            }
             if(this.lives) {
                 if(this.dead >= DEAD * (this.expert? 2: 5)) {
                     this.hp += this.xhp;
@@ -1535,6 +1755,10 @@ var bosses = new Set;
             for(let [enemy, number] of this.lcoll) {
                 if(--number) this.lcoll.set(enemy, number);
                 else this.lcoll.delete(enemy);
+            }
+            if(this.inv) for(let [enemy, number] of this.inv) {
+                if(--number) this.inv.set(enemy, number);
+                else this.inv.delete(enemy);
             }
         }
         movement(m=1, tiles=mapTiles)
@@ -1582,7 +1806,7 @@ var bosses = new Set;
             if(d[0] || d[1]) this.hitWall(...d);
         }
         static radian = (b, a) => {
-            var s = (a.s - b.s)/2;
+            var s = ((a.s||0) - (b.s||0))*.5;
             return atan(a.y - b.y + s, a.x - b.x + s);
         };
         hitWall(x, y)
@@ -1704,6 +1928,8 @@ var bosses = new Set;
         }
         static hitTest(a, b)
         {
+            if(a.hitref) a = a.hitref;
+            if(b.hitref) b = b.hitref;
             if(a.inv?.has(b)) return;
             if(b.inv?.has(a)) return;
             //if(a.dead || a.remove) return;
@@ -1711,7 +1937,7 @@ var bosses = new Set;
             if(a.nohit & b.team || b.nohit & a.team) return 0;
             return (a.hits & b.team) || (b.hits & a.team);
         }
-        pen(ctx=game.ctx, {fill, stroke, scale=1, shape:shp=this.shape, r=0}, hp, zoom=1)
+        pen(ctx=game.ctx, {init, OFF=[], fill, stroke, scale=1, shape:shp=this.shape, r=0}, hp, zoom=1)
         {
             var {x, y, s, alpha=1} = this;
             if(scale != 1) {
@@ -1724,42 +1950,40 @@ var bosses = new Set;
             ctx.lineWidth = 0.1/scale;
             if(this.dead) alpha = .5;
             ctx.globalAlpha = alpha;
+
             var {zoom=1} = this;
             if(zoom) game.zoom(x, y, s, s, r, 0, 0, ctx);
             else ctx.zoom(x, y, s, s, r);
+
             var xhp = this.xhp;
             var hpv = this.hp + xhp * this.lives;
             xhp *= this.ml;
+            var HP = 1;
             if(!isNaN(hp)) {
                 if(hpv < xhp) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(.5, .5);
-                    ctx.arc(.5, .5, 3, -hp, -hp + PI2 * hpv/xhp);
-                    ctx.closePath();
-                    ctx.clip();
+                    HP = hpv/xhp;
                 }
             }
-            if(fill) {
-                ctx.fillStyle = fill;
-                ctx.fill(shape(shp));
-            }
-            if(stroke) {
-                ctx.strokeStyle = stroke;
-                ctx.stroke(shape(shp));
-            }
-            if(!isNaN(hp)) {
-                if(hpv < xhp) {
-                    ctx.restore();
-                }
-            }
+            if(isNaN(hp)) hp = 0;
+
+            var [x, y, w, h] = sprites.grab(shp, stroke, fill, HP, hp, OFF);
+            init?.(ctx);
+            ctx.drawImage(sprites.sheet, x, y, w, h, 0, 0, 1, 1);
+
+            // if(fill) {
+            //     ctx.drawImage(color(shp, fill), 0, 0, 1, 1);
+            // }
+            // if(stroke) {
+            //     ctx.drawImage(color(shp+"S", fill), 0, 0, 1, 1);
+            // }
+            // if(!isNaN(hp)) {
+            //     if(hpv < xhp) {
+            //         ctx.restore();
+            //     }
+            // }
 
             ctx.globalAlpha = 1;
             ctx.strokeStyle = "red";
-            // for(let {x, y, s} of this.boxes) {
-            //     game.zoom(x, y, s, s);
-            //     ctx.strokeRect(0, 0, 1, 1);
-            // }
             ctx.resetTransform();
         }
         draw(ctx) {
@@ -1769,12 +1993,12 @@ var bosses = new Set;
         }
         static distance = (a, b) =>
         {
-            var s = (a.s - b.s)*.5;
+            var s = ((a.s||0) - (b.s||0))*.5;
             return dist(a.y - b.y + s, a.x - b.x + s);
         }
         static rawDistance = (a, b) =>
         {
-            var s = (a.s - b.s)*.5;
+            var s = ((a.s||0) - (b.s||0))*.5;
             return (a.y - b.y + s) ** 2 + (a.x - b.x + s) ** 2;
         }
         static hitbox(a, b)
@@ -1906,6 +2130,7 @@ var bosses = new Set;
         }
         onHit(atk=0, who) {
             this.hp -= atk;
+            (this.hitref || this).inv?.set(who?.hitref || who, 50);
             if(this.hp <= 0) {
                 if(!this.lives) {
                     this.dead = 1;
@@ -1931,6 +2156,7 @@ var bosses = new Set;
         wallInv = 0;
         atk = 1; hp = 1;
         xhp = 1;
+        inv = new Map;
         dead = 0;
         lcoll = new Map;
         s = 0.4;
@@ -1959,6 +2185,9 @@ var TEAM = {
             if(multi) {
                 this.hue = (id/(multi + 1)) * 360;
                 this.safe = 360/((multi + 1) * 4);
+            }
+            if(worldSelect.active) {
+                this.register = this.aiRegister||this.register;
             }
         }
         delete() {
@@ -2020,7 +2249,7 @@ var TEAM = {
                 var inside = dis > scale * 2;
                 if(time > ms * 3 || touch2.end) {
                     if(inside) {
-                        this.skill(hrad);
+                        this.skill(hrad, mrad);
                     }else if(overdue || touch2.end) {
                         this.ability(overdue? 3: 1, mrad, hrad);
                     }
@@ -2060,18 +2289,29 @@ var TEAM = {
         }
         tick()
         {
-            if(this.id == getExtras()) {
-                this.keys();
-                this.touchv2();
-            }else{
-                this.pad();
-                this.online();
+            if(worldSelect.active) {
+                this.ai();
+            }else{ 
+                if(this.id == getExtras()) {
+                    this.keys();
+                    this.touchv2();
+                }else{
+                    this.pad();
+                    this.online();
+                }
+            }
+            if(this.hp < this.xhp) {
+                this.hp += this.regen;
+            }
+            if(this.hp > this.xhp) {
+                this.hp = this.xhp;
             }
             this.stats();
         }
+        ai() {}
         update(m, t) {
             super.update(m, t);
-            if(this.dead) for(let main of mains) {
+            if(!worldSelect.active && this.dead) for(let main of mains) {
                 if(!main.dead && Entity.isTouching(main, this)) {
                     this.revive();
                 }
@@ -2111,7 +2351,7 @@ var TEAM = {
 
             var RT = dead(pad.buttons[7].value);
             if(dis2 && RT) {
-                this.skill(atan(y, x));
+                this.skill(atan(y, x), rad);
                 ctx.strokeStyle = this.color2;
             }else ctx.strokeStyle = this.color;
             ctx.stroke();
@@ -2140,7 +2380,7 @@ var TEAM = {
                 this.move(rad, spd);
             }
             if(!isNaN(srad)) {
-                this.skill(srad);
+                this.skill(srad, rad);
             }
             if(abil) {
                 this.ability(abil, rad, srad);
@@ -2153,7 +2393,8 @@ var TEAM = {
             this.coll = TEAM.ALLY | TEAM.ENEMY;
             this.hits = TEAM.BAD;
         }
-        skill(rad) {}
+        skill(rad, mrad) {}
+        ability(key, mrad, srad) {}
         stats() {
             if(this.lastSkill) --this.lastSkill;
         }
@@ -2181,7 +2422,7 @@ var TEAM = {
             if(x || y)
             {
                 var srad = atan(y, x);
-                this.skill(srad);
+                this.skill(srad, mrad);
             }
 
             if(mouse.d) {
@@ -2192,7 +2433,7 @@ var TEAM = {
                 x -= this.x + s;
                 y -= this.y + s;
                 var srad = atan(y, x);
-                this.skill(srad);
+                this.skill(srad, mrad);
             }
 
             if(keys.has("ShiftRight")) {
@@ -2209,6 +2450,180 @@ var TEAM = {
         team = TEAM.GOOD | TEAM.ALLY;
         coll = TEAM.ALLY | TEAM.ENEMY;
         hits = TEAM.BAD;
+        regen = 0.01;
+        hp = 2.5;
+        xhp = 2.5;
+    }
+    var Guy = class Guy extends Player{
+        constructor(i) {
+            super(i);
+            if(multi) {
+                var {hue, safe} = this;
+                this.color = `hsl(${hue}, 100%, 50%)`;
+                this.color2 = `hsl(${hue}, 100%, 80%)`;
+                this.color3 = `hsl(${hue+safe}, 100%, 80%)`;
+            }
+        }
+        attack(rad) {
+            if(!this.lastSkill) {
+                if(!isNaN(rad)) {
+                    this.move(rad, 3);
+                    this.lastSkill = 5;
+                    this.slash = !this.slash;
+                    var sword = new Sword(this, rad, 3, this.slash);
+                    sword.color = this.color3;
+                    enemies.push(sword);
+                }
+            }
+        }
+        ability(key, rad) {
+            this.attack(rad);
+        }
+        skill(rad) {
+            this.attack(rad);
+        }
+        draw(ctx) {
+            var r = atan(-this.vx, 0.5);
+            this.pen(ctx, {fill: this.color}, 0);
+            this.pen(ctx, {stroke: this.color});
+
+            var init = ctx => ctx.translate(0, -1);
+            this.pen(ctx, {init, shape: "link-hat", fill: this.color2, scale: 1, r, OFF: [0, 1]}, r);
+            this.pen(ctx, {init, shape: "link-hat", stroke: this.color2, scale: 1, r});
+        }
+        ai() {
+            var {target} = this;
+            if(!target) {
+                this.move(atan(this.vy, this.vx));
+            }else{
+                var rad = Entity.radian(this, target);
+                var dis = Entity.distance(this, target);
+                if(dis < 1) {
+                    this.move(rad+PI);
+                    if(this.hp > 2) {
+                        this.skill(rad);
+                    }else{
+                        this.skill(rad+PI);
+                    }
+                }else if(dis > 2) {
+                    if(this.hp > 2) {
+                        this.skill(rad);
+                        this.move(rad);
+                    }else{
+                        this.skill(rad+PI);
+                        this.move(rad+PI);
+                    }
+                }else{
+                    if(this.hp > 2) {
+                        this.skill(rad);
+                    }else{
+                        this.skill(rad+PI);
+                    }
+                }
+            }
+
+            delete this.target;
+            delete this.clo;
+        }
+        aiRegister(enemy) {
+            if(!(this.hits & enemy.team)) return;
+            var bullet = enemy.team & TEAM.BULLET;
+            var dis = Entity.rawDistance(this, enemy);
+
+            var d = bullet? 3 * 3: 15 * 15;
+            var a = dis < d && (!this.clo || dis < this.clo);
+            if(!a || !this.sightCheck(enemy)) return;
+
+            this.target = enemy;
+            this.clo = dis;
+        }
+        xhp = 4.5;
+        hp = 4.5;
+        color = "#eda";
+        color2 = "#5f5";
+        color3 = "#bbb";
+    };
+    var Sword = class Sword extends Entity{
+        constructor(parent, rad, time, rev) {
+            super();
+            this.parent = parent;
+            this.rad = rad;
+            time *= game.steps;
+            this.time = time;
+            this.maxt = time;
+            this.rev = rev;
+            
+            this.parent = parent;
+            this.color = parent.color;
+            this.team = parent.team | TEAM.BULLET;
+            this.hits = parent.hits;
+            this.coll = parent.coll;
+            this.nocoll = TEAM.BULLET;
+            Bullet.position(this, this.R, parent, 2);
+            this.ox = this.x;
+            this.oy = this.y;
+            this.points = [];
+            this.m = 0.1;
+        }
+        get R() {
+            var delta = this.time/this.maxt;
+            if(this.rev) delta = 1 - delta;
+            var swoop = PI*.75;
+            var start = this.rad - swoop*.5;
+            return start + swoop * delta;
+        }
+        proj = 1;
+        s = 1;
+        atk = .5;
+        update() {
+            super.step();
+            Bullet.position(this, this.R, this.parent, 2);
+            this.vx = this.parent.vx;
+            this.vy = this.parent.vy;
+            var {x, y} = this;
+            this.points.push({x, y});
+            if(this.time) --this.time;
+            else this.remove = true;
+        }
+        onHit(dmg, what) {
+            super.onHit(what);
+            this.remove = true;
+        }
+        onCollide() {
+            this.parent.vx += this.vx;
+            this.parent.vy += this.vy;
+        }
+        points = [];
+        draw() {
+            game.scale();
+            var s = this.s*.5;
+            ctx.lineWidth = s;
+            ctx.strokeStyle = this.color;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            let f = 1;
+            if(this.old?.length) {
+                ctx.beginPath();
+                for(let {x, y} of this.old) {
+                    if(f) {
+                        f = 0;
+                        ctx.moveTo(x+s, y+s);
+                    }else ctx.lineTo(x+s, y+s);
+                }
+                ctx.globalAlpha = 1;
+            }
+            for(let {x, y} of this.points) {
+                if(f) {
+                    f = 0;
+                    ctx.moveTo(x+s, y+s);
+                }else ctx.lineTo(x+s, y+s);
+            }
+            ctx.lineTo(this.x+s, this.y+s);
+            this.old = [...this.points, {x: this.x, y: this.y}];
+            ctx.stroke();
+            ctx.resetTransform();
+            this.points = [];
+        }
     }
     var Gunner = class Gunner extends Player{
         rech = "#faa";
@@ -2222,6 +2637,44 @@ var TEAM = {
                 this.rech = `hsl(${hue+safe}, 100%, 80%)`;
             }
             this.read = this.color2;
+        }
+        ai() {
+            var {target} = this;
+            if(!target) {
+                this.move(atan(this.vy, this.vx));
+            }else{
+                var rad = Entity.radian(this, target);
+                var dis = Entity.distance(this, target);
+                if(dis < 3) {
+                    this.move(rad+PI);
+                    if(dis < 1) {
+                        this.ability(1, rad+PI);
+                    }
+                    this.skill(rad);
+                }else if(dis > 4) {
+                    this.move(rad);
+                    if(dis > 6) {
+                        this.ability(1, rad);
+                    }
+                }else{
+                    this.skill(rad);
+                }
+            }
+
+            delete this.target;
+            delete this.clo;
+        }
+        aiRegister(enemy) {
+            if(!(this.hits & enemy.team)) return;
+            var bullet = enemy.team & TEAM.BULLET;
+            var dis = Entity.rawDistance(this, enemy);
+
+            var d = bullet? 3 * 3: 15 * 15;
+            var a = dis < d && (!this.clo || dis < this.clo);
+            if(!a || !this.sightCheck(enemy)) return;
+
+            this.target = enemy;
+            this.clo = dis;
         }
         draw(ctx) {
             var r = atan(this.vy, this.vx);
@@ -2302,9 +2755,6 @@ var TEAM = {
             super();
             this.expert = game.expert;
         }
-        isPlayer(what) {
-            return (what.team & this.hits) && !(what.team & TEAM.BULLET);
-        }
         spawn(tiles) {
             this.mod();
             super.spawn(tiles);
@@ -2319,6 +2769,46 @@ var TEAM = {
         hits = TEAM.GOOD;
         b = 1;
     };
+    var Bad = class Bad extends Enemy{
+        attack(rad) {
+            if(!this.lastSkill) {
+                if(!isNaN(rad)) {
+                    this.move(rad, 5);
+                    this.lastSkill = 20;
+                    this.slash = !this.slash;
+                    var sword = new Sword(this, rad, 5, this.slash);
+                    sword.atk /= 4;
+                    sword.nocoll = TEAM.BULLET | TEAM.BAD;
+                    enemies.push(sword);
+                }
+            }
+        }
+        
+        register(enemy) {
+            if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
+            var dis = Entity.rawDistance(this, enemy);
+            var d = 7 * 7;
+            var clo = this.clo;
+            var a = dis < d && (!this.clo || dis < clo);
+            if(!a) return;
+            if(!this.sightCheck(enemy)) return;
+            var {x, y, s} = enemy;
+            this.target = {x, y, s};
+            this.clo = dis;
+        }
+
+        tick() {
+            var {target} = this;
+            if(target) this.attack(Entity.radian(this, target));
+            if(this.lastSkill) {
+                --this.lastSkill;
+                this.move(atan(this.vy, this.vx));
+            }
+
+            delete this.target;
+            delete this.clo;
+        }
+    };
     var Chill = class Chill extends Enemy{
         color = "#afa";
         register(what) {
@@ -2328,6 +2818,11 @@ var TEAM = {
                     this.target = what.parent;
                 }
             }
+        }
+        draw(ctx) {
+            var r = atan(this.vy, this.vx)
+            this.pen(ctx, {fill: this.color, r}, 0);
+            this.pen(ctx, {stroke: this.color, r});
         }
         tick() {
             var {target} = this;
@@ -2373,7 +2868,7 @@ var TEAM = {
                 // blob.spd = this.spd;
                 // blob.f = this.f;
                 // blob.draw = super.draw;
-                // blob.time = 100;
+                blob.time /= 2;
                 // blob.shape = this.shape;
                 enemies.push(blob);
                 this.lastShot = this.expert? 20: 30;
@@ -2388,7 +2883,7 @@ var TEAM = {
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.rawDistance(this, enemy);
             var d = 7 * 7;
-            var clo = this.clo * this.clo;
+            var clo = this.clo;
             var a = dis < d && (!this.clo || dis < clo);
             if(!a) return;
             if(!this.sightCheck(enemy)) return;
@@ -2424,16 +2919,8 @@ var TEAM = {
             var i = 0;
             while(i < d)
             {
-                // ctx.fillStyle = "blue";
-                // ctx.beginPath();
-                // ctx.arc(px * scale, py * scale, .1 * scale, 0, PI2);
-                // ctx.fill();
                 let x = floor(px);
                 let y = floor(py);
-                
-                // ctx.globalAlpha = 0.1;
-                // ctx.fillRect(x, y, 1, 1);
-                // ctx.globalAlpha = 1;
 
                 if(tiles[Index(x, y)] || outOfBounds(x, y)) {
                     var dis = dist(px - sx, py - sy) + 0.0001;
@@ -2454,18 +2941,8 @@ var TEAM = {
 
                 if(tx < ty) {
                     m = tx;
-                    // ctx.strokeStyle = "orange";
-                    // ctx.beginPath();
-                    // ctx.moveTo(px, py);
-                    // ctx.lineTo(px + mx * sign(ux), py);
-                    // ctx.stroke();
                 }else{
                     var m = ty;
-                    // ctx.strokeStyle = "purple";
-                    // ctx.beginPath();
-                    // ctx.moveTo(px, py);
-                    // ctx.lineTo(px, py + my * sign(uy));
-                    // ctx.stroke();
                 }
                 m += 0.0001;
 
@@ -2473,13 +2950,6 @@ var TEAM = {
                 py += uy * m;
                 i += m;
             }
-            // ctx.beginPath();
-            // ctx.lineWidth = 0.05;
-            // ctx.strokeStyle = see? "green": "red";
-            // ctx.moveTo(sx, sy);
-            // ctx.lineTo(ex, ey);
-            // ctx.stroke();
-            // ctx.resetTransform();
 
             return see;
         }
@@ -2581,6 +3051,7 @@ var TEAM = {
             this.remove = true;
         }
         onHit(atk, who) {
+            super.onHit(who)
             this.remove = true;
             var {x, y} = this;
             this.points.push({x, y});
@@ -2625,15 +3096,15 @@ var TEAM = {
         time = 8;
         spd = 1;
         f = 0.01;
-        static position(what, rad, parent) {
+        static position(what, rad, parent, off=0) {
             if(!parent) parent = what.parent;
             var s = what.s * .5;
             var ps = parent.s;
             what.r = rad;
             var c = cos(rad), s = sin(rad);
 
-            c *= 0;
-            s *= 0;
+            c *= off;
+            s *= off;
 
             what.lcoll.set(parent, 30);
 
@@ -2664,6 +3135,7 @@ var TEAM = {
             this.pen(ctx, {stroke: this.color, r});
         }
         onHit(atk, who) {
+            super.onHit(who);
             this.remove = true;
         }
         hitWall(x, y) {
@@ -2920,12 +3392,12 @@ var TEAM = {
             this.brainPoints = [];
             this.rad = random(PI2);
         }
-        calcs = 8;
+        calcs = 1/8;
         brainMove() {
             var lines = [];
             var max;
-            var add = (PI * 2)/this.calcs;
-            for(let a = 0; a < PI * 2; a += add) {
+            var add = PI2*this.calcs;
+            for(let a = 0; a < PI2; a += add) {
                 var num = 0;
                 for(let [rad, pow] of this.brainPoints) {
                     let n = pow < 0; //iaNegative?
@@ -2949,8 +3421,7 @@ var TEAM = {
             this.rad = rad;
 
             this.move(rad, max);
-            // this.vx += cos(rad) * this.spd * max;
-            // this.vy += sin(rad) * this.spd * max;
+
             this.crad = rad;
             this.cmax = max;
             this.lines = lines;
@@ -2966,7 +3437,7 @@ var TEAM = {
             var mx = this.x + this.s * .5;
             var my = this.y + this.s * .5;
 
-            var d = 3;
+            var d = 2;
             var p = 5;
             var o = PI * .25;
             var off = PI * .125;
@@ -3038,7 +3509,8 @@ var TEAM = {
         shape = 'square.4';
         color = "#666";
         color2 = "#fa5";
-        dist = 10;
+        dist = 5;
+        nocoll = TEAM.BAD;
         constructor() {
             super();
             if(this.expert) {
@@ -3084,30 +3556,212 @@ var TEAM = {
             super.tick(tiles);
         }
         register(enemy, sight=true) {
-            if((this.team & enemy.team) && !(enemy.team & TEAM.BULLET)) {
-                var dis = Entity.rawDistance(this, enemy);
-                var d = (enemy.s + this.s)*1.5;
-                var a = dis < d*d;
-                if(!a) return;
-                // if(!this.sightCheck(enemy)) return;
-                dis = dis**.5;
-                if(dis < d) {
-                    var n = (dis - d)/-d;
-                    var rad = Entity.radian(this, enemy);
-                    n **= 2;
-                    this.brainPoints.push([rad, -n]);
-                }
-            }
+            // if((this.team & enemy.team) && !(enemy.team & TEAM.BULLET)) {
+            //     var dis = Entity.rawDistance(this, enemy);
+            //     var d = (enemy.s + this.s)*1.5;
+            //     var a = dis < d*d;
+            //     if(!a) return;
+            //     // if(!this.sightCheck(enemy)) return;
+            //     dis = dis**.5;
+            //     if(dis < d) {
+            //         var n = (dis - d)/-d;
+            //         var rad = Entity.radian(this, enemy);
+            //         n **= 2;
+            //         this.brainPoints.push([rad, -n]);
+            //     }
+            // }
             if(!(this.hits & enemy.team) || enemy.team & TEAM.BULLET) return;
             var dis = Entity.rawDistance(this, enemy);
             var d = this.dist;
             var a = dis < d*d && (dis < this.clo || !this.clo);
             if(!a) return;
+
             if(sight && !this.sightCheck(enemy)) return;
             var {x, y, s} = enemy;
             this.target = {x, y, s, time: 50};
             this.clo = dis;
         }
+    }
+}
+{
+    var Ghost = class Ghost extends Enemy{
+        constructor() {
+            super();
+            this.r = random(PI2);
+        }
+        color = 'white';
+        shape2 = "arrow.2";
+        color2 = "black";
+        tick(tiles=mapTiles) {
+            var s = this.s;
+            var mx = this.x+s*.5;
+            var my = this.y+s*.5;
+            var tx = floor(mx);
+            var ty = floor(my);
+            if(this.tx != tx || this.ty != ty) {
+                this.tx = tx;
+                this.ty = ty;
+                this.onTile(tiles);
+            }
+            if(this.goal) {
+                var rad = Entity.radian(this, this.goal);
+                this.move(rad);
+            }
+        }
+        hitWall(...a) {
+            super.hitWall(...a);
+            delete this.tx;
+            delete this.ty;
+        }
+        onCollide() {
+            delete this.tx;
+            delete this.ty;
+            delete this.r;
+        }
+        onTile(tiles) {
+            var res = [];
+            for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+            {
+                dx += this.tx;
+                dy += this.ty;
+                if(outOfBounds(dx, dy)) res.push(1);
+                else if(tiles[Index(dx, dy)]) res.push(1);
+                else res.push(0);
+            }
+            var [t, b, l, r, tl, bl, tr, br] = res;
+
+            var options = [];
+            var P = PI * .5;
+            if(!r && this.r != PI) options.push(0);
+            if(!t && this.r != P) options.push(P*3);
+            if(!l && this.r != 0) options.push(PI);
+            if(!b && this.r != P*3) options.push(P);
+
+            if(options.includes(this.r)) {
+                options.push(this.r);
+                options.push(this.r);
+            }
+
+            if(options.length) {
+                // if(!options.includes(this.r)) {
+                    this.r = randomOf(options);
+                // }
+
+                this.goal = {
+                    x: this.tx + cos(this.r),
+                    y: this.ty + sin(this.r),
+                    s: 1
+                };
+            }else{
+                this.r = random(PI2);
+                delete this.goal;
+            }
+        }
+        draw() {
+            var r = this.r+PI*.5;
+            super.draw(ctx);
+            this.pen(ctx, {shape: this.shape2, fill: this.color2, stroke: this.color2, r}, PI*.5);
+
+            // var goal = this.goal;
+            // if(!goal) return;
+            // ctx.strokeStyle = this.color;
+            // this.drawLine(ctx, this.tx, this.ty, goal.x, goal.y);
+        }
+        drawLine(ctx, x, y, a, b) {
+            x += .5;
+            y += .5;
+            a += .5;
+            b += .5;
+
+            game.scale(ctx);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(a, b);
+            ctx.stroke();
+            ctx.resetTransform();
+        }
+    }
+    var RedGhost = class RedGhost extends Ghost{
+        onTile(tiles) {
+            var res = [];
+            for(let [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]])
+            {
+                dx += this.tx;
+                dy += this.ty;
+                if(outOfBounds(dx, dy)) res.push(1);
+                else if(tiles[Index(dx, dy)]) res.push(1);
+                else res.push(0);
+            }
+            var [t, b, l, r, tl, bl, tr, br] = res;
+
+            var options = [];
+            var P = PI * .5;
+            if(!r && this.r != PI) options.push(0);
+            if(!t && this.r != P) options.push(P*3);
+            if(!l && this.r != 0) options.push(PI);
+            if(!b && this.r != P*3) options.push(P);
+
+            // if(options.includes(this.r)) {
+            //     options.push(this.r);
+            //     options.push(this.r);
+            // }
+
+            if(options.length) {
+                if(!this.target) {
+                    if(!options.includes(this.r)) {
+                        this.r = randomOf(options);
+                    }
+                    this.color = "blue";
+                }else{
+                    this.color = "orange";
+                    var player = this.target;
+
+                    var dists = options.map(R => {
+                        var obj = {
+                            x: this.tx + cos(R),
+                            y: this.ty + sin(R),
+                            s: 1
+                        };
+                        var dis = Entity.rawDistance(player, obj);
+                        // game.ctx.strokeStyle = "blue";
+                        // this.drawLine(game.ctx, this.tx, this.ty, obj.x, obj.y)
+                        return dis;
+                    });
+                    var l = dists.length;
+                    var p, n, c = 1000000;
+                    for(let i = 0; i < l; i++) {
+                        if((n = dists[i]) < c) {
+                            p = options[i];
+                            c = n;
+                        }
+                    }
+                    this.r = p;
+                }
+
+                this.goal = {
+                    x: this.tx + cos(this.r),
+                    y: this.ty + sin(this.r),
+                    s: 1
+                };
+            }else{
+                this.r = random(PI2);
+                delete this.goal;
+            }
+        }
+        tick(tiles) {
+            super.tick(tiles);
+            delete this.target;
+            this.clo = 10000;
+        }
+        clo = 10000;
+        register(what) {
+            var dis = Entity.rawDistance(this, what);
+            if(this.isPlayer(what) && dis < this.clo) {
+                this.target = what;
+                this.clo = dis;
+            }
+        }
+        color = "red";
     }
 }
 {
@@ -3237,7 +3891,7 @@ var TEAM = {
             this.drawWith(ctx, {x, y, s, alpha: 1, zoom: 0, vx: 0, vy: 0, hp: this.xhp});
         }
         summon(cla) {
-            if(!this.spawned) return;
+            // if(!this.spawned) return;
             var blob = new cla();
             blob.color = this.color;
             blob.color2 = this.color2;
@@ -3256,7 +3910,7 @@ var TEAM = {
         time = 0;
         phase = 0;
         dist = 20;
-        calcs = 16;
+        calcs = 1/16;
         r = 0;
         constructor() {
             super();
@@ -3331,6 +3985,7 @@ var TEAM = {
                         let blob = new Ball(this, rad);
                         blob.time = expert? 130: 200;
                         blob.move(rad, 25);
+                        blob.hitref = this;
                         blob.nocoll = TEAM.BAD;
                         enemies.push(blob);
                     }
@@ -3356,13 +4011,29 @@ var TEAM = {
         ++level;
         loadLevel(obj, world);
     }
-    function loadLevel(obj, world) {
+    function loadLevel(obj, world, _players=[]) {
         loader.delay = 51;
         loader.time  = 51;
         loader.color = world.color;
         loader.color2 = world.color2;
         loader.dir = 0;
         loader.expert = expert;
+        let NoDelete = blob => {
+            let obj = {};
+            for(let prop of [
+                "hp",
+                "dead",
+                "team",
+                "coll",
+                "hits",
+                "nocoll"
+            ]) {
+                obj[prop] = blob[prop];
+            }
+            return function() {
+                Object.assign(this, obj);
+            }
+        };
         var {spawn=[], tiles="", seed} = obj;
         if(seed) lehmer.seed = seed;
         var layout = Binary(tiles);
@@ -3382,71 +4053,146 @@ var TEAM = {
             }
             for(let a = 0; a < num; a++) {
                 var blob = new cla();
-                // if(worldSelect.active) {
-                    blob.nospawn = (tiles=mapTiles) => {
-                        for(let them of loader.enemies) {
-                            if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
-                                return true;
-                            }
+                blob.nospawn = (tiles=mapTiles) => {
+                    for(let them of loader.enemies) {
+                        if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
+                            return true;
                         }
-                        return blob.inWall(0, tiles);
                     }
-                // }
+                    return blob.inWall(0, tiles);
+                }
+                if(worldSelect.active) {
+                    blob.delete = NoDelete(blob);
+                }
                 blob.spawn(loader.tiles);
                 loader.enemies.push(blob);
             }
         }
-    }
-    var world1 = {
-        world: {
-            tiles: "01000201c47008000000201c4700800100",
-            spawn: [5, Wall, 5, Mover]
-        },
-        levels: [{
-            spawn: [10, Chill],
-        }, {
-            spawn: [10, Mover],
-            tiles: "0000000060c00000380000060c00000000"
-        }, {
-            tiles: "0000202040408080380202040408080000",
-            spawn: [10, Wall]
-        }, {
-            tiles: "01000201c47008000000201c4700800100",
-            spawn: [5, Wall, 5, Mover]
-        }, {
-            tiles: "0000202040400000100000040408080000",
-            spawn: [Boss],
-            name: "Captain Motion"
-        }],
-        name: "World 1",
-        color2: (w, h) => {
-            let x = w * .5;
-            let y = h * .5;
-            let r = max(w,h);
-            // let col = ctx.createLinearGradient(0, h, w, 0);
-            let col = ctx.createRadialGradient(x, y, 1, x, y, r);
-            col.addColorStop(0, "#3c3c3c");
-            col.addColorStop(.5, "#393939");
-            col.addColorStop(1, "#303030");
-            return col;
-        },
-        color: (w, h) => {
-            let col = ctx.createLinearGradient(0, 0, w, h);
-            col.addColorStop(0, "#bbb");
-            col.addColorStop(.5, "#fff");
-            col.addColorStop(1, "#aaa");
-            return col;
+        let i = 0;
+        for(let cla of _players) {
+            var blob = new cla(i++);
+            // if(worldSelect.active) {
+                blob.nospawn = (tiles=mapTiles) => {
+                    for(let them of loader.enemies) {
+                        if((Entity.hitTest(blob, them) || Entity.collTest(blob, them)) && Entity.isTouching(blob, them)) {
+                            return true;
+                        }
+                    }
+                    return blob.inWall(0, tiles);
+                }
+                blob.spawn = Enemy.prototype.spawn;
+                blob.mod = () => {};
+                blob.delete = NoDelete(blob);
+            // }
+            blob.spawn(loader.tiles);
+            loader.enemies.push(blob);
         }
-    };
+    }
     {
         let canv = document.createElement("canvas");
         let ctx1 = canv.getContext("2d");
         let canv2 = document.createElement("canvas");
         let ctx2 = canv2.getContext("2d");
-        canv.width = 100;
-        canv.height = 100;
-        canv2.width = 100;
-        canv2.height = 100;
+        let n = 64;
+        canv.width = n;
+        canv.height = n;
+        canv2.width = n;
+        canv2.height = n;
+        let draw = () => {
+            var {width: w, height: h} = canv;
+            var ctx = ctx1; //bottom
+            ctx.fillStyle = "#111";
+            ctx.strokeStyle = "#aaa";
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeRect(0, 0, w, h);
+            // ctx.scale(w, h);
+
+            var ctx = ctx2; //top
+            ctx.fillStyle = "#999";
+            ctx.strokeStyle = "#555";
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeRect(0, 0, w, h);
+        };
+        draw();
+        var test = {
+            world: {
+                tiles: "01000001fbf0140fabe0501fbf00000100",
+                spawn: [5, Ghost, 5, RedGhost]
+            },
+            levels: [{
+                tiles: "01000001fbf0140fabe0501fbf00000100",
+                spawn: [10, RedGhost],
+                name: "Ghosts"
+            }, {
+                spawn: [10, Bad],
+                name: "Swords"
+            }],
+            name: "Test",
+            color2: (w, h, z) => {
+                let col = ctx.createPattern(canv, "repeat");
+                col.setTransform(zoomMatrix(0, 0, 1/n, 1/n));
+                return col;
+            },
+            color: (w, h, z) => {
+                let col = ctx.createPattern(canv2, "repeat");
+                col.setTransform(zoomMatrix(0, 0, 1/n, 1/n));
+                return col;
+            }
+        };
+    }
+    {//old
+        var world1 = {
+            world: {
+                tiles: "01000201c47008000000201c4700800100",
+                spawn: [5, Wall, 5, Mover]
+            },
+            levels: [{
+                spawn: [10, Chill],
+            }, {
+                spawn: [10, Mover],
+                tiles: "0000000060c00000380000060c00000000"
+            }, {
+                tiles: "0000202040408080380202040408080000",
+                spawn: [10, Wall]
+            }, {
+                tiles: "01000201c47008000000201c4700800100",
+                spawn: [5, Wall, 5, Mover]
+            }, {
+                tiles: "0000202040400000100000040408080000",
+                spawn: [Boss],
+                name: "Captain Motion"
+            }],
+            name: "World 1",
+            color2: (w, h) => {
+                let x = w * .5;
+                let y = h * .5;
+                let r = max(w,h);
+                // let col = ctx.createLinearGradient(0, h, w, 0);
+                let col = ctx.createRadialGradient(x, y, 1, x, y, r);
+                col.addColorStop(0, "#3c3c3c");
+                col.addColorStop(.5, "#393939");
+                col.addColorStop(1, "#303030");
+                return col;
+            },
+            color: (w, h) => {
+                let col = ctx.createLinearGradient(0, 0, w, h);
+                col.addColorStop(0, "#bbb");
+                col.addColorStop(.5, "#fff");
+                col.addColorStop(1, "#aaa");
+                return col;
+            }
+        };
+    }
+    {
+        let canv = document.createElement("canvas");
+        let ctx1 = canv.getContext("2d");
+        let canv2 = document.createElement("canvas");
+        let ctx2 = canv2.getContext("2d");
+        let n = 64;
+        canv.width = n;
+        canv.height = n;
+        canv2.width = n;
+        canv2.height = n;
         let draw = () => {
             var {width: w, height: h} = canv;
             var ctx = ctx1;
@@ -3513,16 +4259,16 @@ var TEAM = {
             }, {
                 tiles: "0000020004000007c7c000004000800000",
                 spawn: [TurretBoss],
-                label: "Ball Master"
+                name: "Ball Master"
             }],
             color2: (w, h, z) => {
                 let col = ctx.createPattern(canv, "repeat");
-                col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));
+                col.setTransform(zoomMatrix(0, 0, 1/n, 1/n));
                 return col;
             },
             color: (w, h, z) => {
                 let col = ctx.createPattern(canv2, "repeat");
-                col.setTransform(zoomMatrix(0, 0, 1/z, 1/z));
+                col.setTransform(zoomMatrix(0, 0, 1/n, 1/n));
                 return col;
             }
         }
@@ -3537,7 +4283,7 @@ var TEAM = {
         name: "Minigames",
         color2: func("#111"),
         color: func("#ccc")
-    }
+    };
     let pads = [];
     let PadTracker = class PadTracker{
         constructor(id) {
@@ -3570,11 +4316,14 @@ var TEAM = {
             }
         }
     };
-    let worlds = [world1, world2, minigames];
+    let worlds = [world1, world2, test];
     let selectedWorld = 0;
     let loadedWorld = -1;
     let selectedLevel = 0;
     let loadedLevel = -1;
+    let _players = [0];
+    let Class = [Gunner, Guy];
+    let Players = () => _players.map(id => Class[id]);
     let dir;
     let mnu = 0;
     var button = new Button;
@@ -3593,7 +4342,7 @@ var TEAM = {
         if(lworld != sworld) {
             loader.enemies = [];
             let wrld = wrlds[sworld];
-            if(mnu) loadLevel(wrld, sWorld);
+            if(mnu) loadLevel(wrld, sWorld, Players());
             else loadLevel(wrld.world, wrld);
             if(lworld == -1) {
                 game.color = wrld.color;
@@ -3668,6 +4417,7 @@ var TEAM = {
             pads.push(new PadTracker(pads.length));
         }
 
+        let j = 0;
         var A_button = false;
         var B_button = false;
         var Left = false;
@@ -3680,12 +4430,24 @@ var TEAM = {
             if(pad.use(1)) {
                 B_button = true;
             }
+            let i = j;
+            if(pad.use(12)) {
+                if(mnu) loadedLevel = -1;
+                ++_players[i];
+                _players[i] %= Class.length;
+            }
+            if(pad.use(13)) {
+                if(mnu) loadedLevel = -1;
+                _players[i] += Class.length - 1;
+                _players[i] %= Class.length;
+            }
             if(pad.use(14)) {
                 Left = true;
             }
             if(pad.use(15)) {
                 Right = true;
             }
+            ++j;
         };
         {
             let wid = (game._x-1)*scale;
@@ -3713,15 +4475,41 @@ var TEAM = {
         }
         if(keys.use("ArrowRight") || Right) {
             if(mnu) selectedLevel = loop(sworld+1, wrlds.length);
-            else selectedWorld = loop(sworld + 1, wrlds.length);
+            else{
+                selectedWorld = loop(sworld + 1, wrlds.length);
+                selectedLevel = 0;
+            }
             dir = 1;
             if(loader.delay) loader.load();
         }
         if(keys.use("ArrowLeft") || Left) {
             if(mnu) selectedLevel = loop(sworld-1, wrlds.length);
-            else selectedWorld = loop(sworld - 1, wrlds.length);
+            else{
+                selectedWorld = loop(sworld - 1, wrlds.length);
+                selectedLevel = 0;
+            }
             dir = -1;
             if(loader.delay) loader.load();
+        }
+        while(_players.length < multi+1) {
+            _players.push(0);
+            if(mnu) loadedLevel = -1;
+        }
+        if(_players.length > multi+1) {
+            _players.length = multi+1
+            if(mnu) loadedLevel = -1;
+        }
+        if(keys.use("ArrowUp")) {
+            if(mnu) loadedLevel = -1;
+            let i = multi;
+            ++_players[i];
+            _players[i] %= Class.length;
+        }
+        if(keys.use("ArrowDown")) {
+            if(mnu) loadedLevel = -1;
+            let i = multi;
+            _players[i] += Class.length - 1;
+            _players[i] %= Class.length;
         }
         if(keys.use("Backspace") || B_button) {
             if(mnu) {
@@ -3755,15 +4543,17 @@ var TEAM = {
         enemies = [];
         mains = [];
         for(let i = 0; i <= multi; i++) {
-            mains.push(new Gunner(i).spawn());
+            mains.push(new Class[_players[i]](i).spawn());
         }
         enemies = mains;
     };
     worldSelect.active = true;
 };
+
 onload = () =>
 {
     onresize();
     document.body.appendChild(canvas);
+    // document.body.appendChild(sprites.sheet);
     init();
 };

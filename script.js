@@ -1,7 +1,8 @@
 "use strict";
-const gameVersion = "0.0.24";
+const gameVersion = "0.0.25";
 const RUN_KEY = Symbol();
 var Enviroment = window.Enviroment;
+
 // https://jummbus.bitbucket.io/#j5N07Unnamedn310s1k0l00e0vt3sa7g0vj0dr1O_U00000000i0o434T0v0ru00f0000q0B1610Oa0d080w2h8E1b8T5v0pu21f0000q0B1610Oa0d080H_SJ5SJFAAAkAAAh8E1b8T0v0pu00f0000qwB17110Oa0d080wbh0E1b6T4v0kuf0f1a0q050Oa0z6666ji8k8k3jSBKSJJAArriiiiii07JCABrzrrrrrrr00YrkqHrsrrrrjr005zrAqzrjzrrqr1jRjrqGGrrzsrsA099ijrABJJJIAzrrtirqrqjqixzsrAjrqjiqaqqysttAJqjikikrizrHtBJJAzArzrIsRCITKSS099ijrAJS____Qg99habbCAYrDzh00E0b8jgxd24QlBsxedQQ8jUxd0004zgidx8Q4zoid18Q4zg01llld3kQdlll4x8i5zgR4h4h4h4h4h4h4h4h4h4h4gp28FFAu46nicKh8Wh7icLh6nhcKBiEAt8OZ8pt4OWle18WpBWwlcni8W0Ki5O97g5Ox7g8Wh7AODA54zwq9BQOewhQiezhQRczwq9BQOewhQ2eEhWwmGbgFyQhq5czE4t8zjbZfA0KP8W0Ki5O97g5Op7g8Wh6CTWq_xys82Q1sxN2zhwql5nbZzOf9hFB-wj8Z6wnQamiOl0R-i9yWoJ0n8r2zhFQGePaqpjduykQjyq9jhaul6nmcKKpt4OZ8pt4OWh7i8Wh6CTWaZBDB-w84bXjfbYA7aoLRgBwxvFjA8bZ4nt1vGNFgnw5cn3GkybgAGwJ0FEQF0mHlE2Qa50mxiG2QaJ0n91qMJkmCbgaqwJkmIkR1q0J0mCbg5G2QOfl4tczGAt4zE4t0zE6nF2eyhRieyhQOeyhQ3bQNBQjbF6nhcKCbH1qoJ8mGbgaqMJkmwbg5FyQ1q0Jomwkw5cz417g8W97h8W17k8W96Cny5ckg2Q1q0J0npp4mwbg5Omh5E2Q1o0mAbJuPka53aV6xAqt0LV9gEkcBAq6hFliY00
 var bullets = [];
 var enemies = [];
@@ -105,6 +106,33 @@ var Host;
         path.closePath();
         path.rotation = PI / 2;
     });
+    shape("arrow", ctx => {
+        ctx.rect(0, .25, .5, .5);
+        ctx.moveTo(.5, 0);
+        ctx.lineTo(.5, 1);
+        ctx.lineTo(1, .5);
+        ctx.closePath();
+    });
+    shape("X", ctx => {
+        var s = 0.1;
+        var S = 1-s;
+        var m = S/2;
+        var M = 1-m;
+        var h = 0.5;
+        ctx.moveTo(0, s);
+        ctx.lineTo(s, 0);
+        ctx.lineTo(h, m);
+        ctx.lineTo(S, 0);
+        ctx.lineTo(1, s);
+        ctx.lineTo(M, h);
+        ctx.lineTo(1, S);
+        ctx.lineTo(S, 1);
+        ctx.lineTo(h, M);
+        ctx.lineTo(s, 1);
+        ctx.lineTo(0, S);
+        ctx.lineTo(m, h);
+        ctx.closePath();
+    });
     shape("link-hat", path => {
         //Top Triangle
         path.moveTo(.5, 1-2**.5/2);
@@ -170,7 +198,7 @@ var sprites = (() => {
         sheet, pen, s,
         canvas, ctx,
         spriteMap: map,
-        grab(shp, st, fl, hp, Of, OFF) {
+        grab(shp, st, fl, hp, Of, OFF=[0, 0]) {
             if(OFF.length == 0) OFF = [0, 0];
             if(isNaN(hp)) hp = 1;
             hp = round(hp*un);
@@ -699,10 +727,13 @@ function color(shape, color) {
         scale = min(scaleX, scaleY) * game.zoomL;
     };
     var mouse = {x: 0, y: 0, d: 0, s: 0};
-    oncontextmenu = (e) => (mouse.d = 2, onmousemove(e), e.preventDefault());
-    onmousedown = (e) => (mouse.d = 1, onmousemove(e));
-    onmouseup = (e) => (mouse.d = 0, onmousemove(e));
-    onmousemove = ({pageX: x, pageY: y}) => (mouse.x = x, mouse.y = y);
+    if(!window.mobileDebug) {
+        oncontextmenu = (e) => (mouse.d = 2, onmousemove(e), e.preventDefault());
+        onmousedown = (e) => (mouse.d = 1, onmousemove(e));
+        onmouseup = (e) => (mouse.d = 0, onmousemove(e));
+        onmousemove = ({pageX: x, pageY: y}) => (mouse.x = x, mouse.y = y);
+    }
+
     // ontouchstart = (e) => [...e.changedTouches].forEach(touch => onmousedown(touch));
     // ontouchmove = (e) => [...e.changedTouches].forEach(touch => onmousemove(touch));
     // ontouchend = (e) => [...e.changedTouches].forEach(touch => onmouseup(touch));
@@ -1326,18 +1357,32 @@ var TIME = 0;
                     Menu = true;
                 }
             };
+            {
+                button.resize(0, 0, scale, scale);
+                button.draw();
+                if(buttonClick(button, 1, 1)) {
+                    Menu ||= true;
+                }
+            }
             if(keys.use("Backspace") || Menu) {
                 worldSelect.active = true;
                 bosses.clear();
             }
-            if(keys.use("Space") || X_button) {
-                var allDead = true;
-                for(let blob of mains) {
-                    if(!(blob.dead || blob.remove)) {
-                        allDead = false;
-                        break;
-                    }
+            let allDead = true;
+            for(let blob of mains) {
+                if(!(blob.dead || blob.remove)) {
+                    allDead = false;
+                    break;
                 }
+            }
+            if(allDead) {
+                button.resize(0, 0, game.width, game.height);
+                button.draw();
+                if(buttonClick(button, 0, 1)) {
+                    X_button ||= true;
+                }
+            }
+            if(keys.use("Space") || X_button) {
                 if(allDead) {
                     --level;
                     mapTiles = [];
@@ -1650,8 +1695,14 @@ var TIME = 0;
                 ++i;
             });
         }
-        if(!worldSelect.active) for(let blob of enemies) {
-            blob.draw();
+        if(!worldSelect.active) {
+            for(let blob of enemies) {
+                blob.draw();
+            }
+            ctx.zoom(0, 0, scale, scale);
+            ctx.fillStyle = "red";
+            ctx.fill(shape("X"));
+            ctx.resetTransform();
         }
         ctx.resetTransform();
         enemies = enemies.filter(b => !b.remove);
@@ -2517,6 +2568,7 @@ var TEAM = {
                     if(this.hp > 2) {
                         this.skill(rad);
                     }else{
+                        this.move(rad+PI);
                         this.skill(rad+PI);
                     }
                 }
@@ -2558,7 +2610,7 @@ var TEAM = {
             this.team = parent.team | TEAM.BULLET;
             this.hits = parent.hits;
             this.coll = parent.coll;
-            this.nocoll = TEAM.BULLET;
+            // this.nocoll = TEAM.BULLET;
             Bullet.position(this, this.R, parent, 2);
             this.ox = this.x;
             this.oy = this.y;
@@ -2580,6 +2632,8 @@ var TEAM = {
             Bullet.position(this, this.R, this.parent, 2);
             this.vx = this.parent.vx;
             this.vy = this.parent.vy;
+            this.ovx = this.vx;
+            this.ovy = this.vy;
             var {x, y} = this;
             this.points.push({x, y});
             if(this.time) --this.time;
@@ -2590,8 +2644,8 @@ var TEAM = {
             this.remove = true;
         }
         onCollide() {
-            this.parent.vx += this.vx;
-            this.parent.vy += this.vy;
+            this.parent.vx += this.vx - this.ovx;
+            this.parent.vy += this.vy - this.ovy;
         }
         points = [];
         draw() {
@@ -2603,7 +2657,6 @@ var TEAM = {
             ctx.beginPath();
             let f = 1;
             if(this.old?.length) {
-                ctx.beginPath();
                 for(let {x, y} of this.old) {
                     if(f) {
                         f = 0;
@@ -2778,7 +2831,7 @@ var TEAM = {
                     this.slash = !this.slash;
                     var sword = new Sword(this, rad, 5, this.slash);
                     sword.atk /= 4;
-                    sword.nocoll = TEAM.BULLET | TEAM.BAD;
+                    // sword.nocoll = TEAM.BULLET | TEAM.BAD;
                     enemies.push(sword);
                 }
             }
@@ -4384,6 +4437,13 @@ var TEAM = {
             ctx.fillStyle = c2;
             ctx.fill();
             ctx.stroke();
+            if(mnu) {
+                button.resize(x1, 0, w2, y);
+                button.draw();
+                if(buttonClick(button)) {
+                    var UP = 1;
+                }
+            }
         }
         ctx.fillStyle = c1;
         ctx.fillText(label, (game.width-wid)*.5, h * 1);
@@ -4408,6 +4468,13 @@ var TEAM = {
                 ctx.fillStyle = c2;
                 ctx.fill();
                 ctx.stroke();
+                {
+                    button.resize(x1, y, w2, b-y);
+                    button.draw();
+                    if(buttonClick(button)) {
+                        var DOWN = 1;
+                    }
+                }
             }
             ctx.fillStyle = c1;
             ctx.fillText(label, (game.width-wid)*.5, h * 9.4);
@@ -4456,22 +4523,35 @@ var TEAM = {
             let y = (innerHeight-h)*.5;
             button.resize(x, y, h, h);
             button.draw();
+            let PAD = h * 0.1;
+            {
+                ctx.zoom(x+PAD, y+PAD, h-PAD-PAD, h-PAD-PAD, PI);
+                let shp = shape("arrow");
+                ctx.fill(shp);
+                ctx.resetTransform();
+            }
             Left ||= buttonClick(button);
             x = innerWidth - h;
             button.resize(x, y, h, h);
             button.draw();
-            Right ||= buttonClick(button);
+            {
+                ctx.zoom(x+PAD, y+PAD, h-PAD-PAD, h-PAD-PAD);
+                let shp = shape("arrow");
+                ctx.fill(shp);
+                ctx.resetTransform();
+            }
+            Right ||= buttonClick(button, 0, 1);
             x = wid;
             y = (game._y-1)*scale;
             let w = (game.w+2)*scale;
             h = (game.h+2)*scale;
             button.resize(x, y, w, h);
             button.draw();
-            let a = buttonClick(button);
+            let a = buttonClick(button, 0, 1);
             if(a) canvas.requestFullscreen();
             A_button ||= a;
             button.resize(0, 0, game.width, game.height);
-            B_button ||= buttonClick(button);
+            B_button ||= buttonClick(button, 0, 1);
         }
         if(keys.use("ArrowRight") || Right) {
             if(mnu) selectedLevel = loop(sworld+1, wrlds.length);
@@ -4499,13 +4579,13 @@ var TEAM = {
             _players.length = multi+1
             if(mnu) loadedLevel = -1;
         }
-        if(keys.use("ArrowUp")) {
+        if(keys.use("ArrowUp") || UP) {
             if(mnu) loadedLevel = -1;
             let i = multi;
             ++_players[i];
             _players[i] %= Class.length;
         }
-        if(keys.use("ArrowDown")) {
+        if(keys.use("ArrowDown") || DOWN) {
             if(mnu) loadedLevel = -1;
             let i = multi;
             _players[i] += Class.length - 1;

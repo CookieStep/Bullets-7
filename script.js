@@ -1699,10 +1699,10 @@ var TIME = 0;
             for(let blob of enemies) {
                 blob.draw();
             }
-            ctx.zoom(0, 0, scale, scale);
-            ctx.fillStyle = "red";
-            ctx.fill(shape("X"));
-            ctx.resetTransform();
+            // ctx.zoom(0, 0, scale, scale);
+            // ctx.fillStyle = "red";
+            // ctx.fill(shape("X"));
+            // ctx.resetTransform();
         }
         ctx.resetTransform();
         enemies = enemies.filter(b => !b.remove);
